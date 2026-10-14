@@ -9,7 +9,7 @@
 | 功能 | 接口 |
 |---|---|
 | 视频 | VIM4 uStreamer：vfmcapsrc → DMA → amlvenc / vim4jpegenc |
-| 浏览器视频 | Janus H.264 WebRTC、原生 H.264 media WebSocket、MJPEG |
+| 浏览器视频 | Janus H.264/H.265 WebRTC、原生 H.264 media WebSocket、MJPEG |
 | HDMI 声音 | Janus uStreamer 插件，ALSA hw:AMLAUGESOUND,0，48 kHz |
 | 键盘、绝对鼠标、相对鼠标 | hidg0、hidg1、hidg2；与板级报告长度匹配，关闭水平滚轮 |
 | 本地虚拟介质 | 板级 mass_storage.disk0/lun.0；镜像存储在 /var/lib/kvmd/msd |
@@ -49,6 +49,10 @@ PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pik
 ## 边界
 
 当前输出尺寸跟随 HDMI 输入，视频帧率可限制，H.264 码率范围 1000–60000 kbps。
-H.265 未接入 PiKVM 的视频接口。EDID/HDR 使用已有板级工具与管理器。
+默认 H.264，关键帧间隔 30 帧。可在 `/etc/default/vim4-pikvm` 设置
+`VIM4_VIDEO_CODEC=h265` 并重启服务，启用 H.265 WebRTC；需浏览器支持 HEVC WebRTC。
+这是整组服务的启动配置，所有观看者共用一个编码器；不支持按观看者自动切换编码。
+H.265 模式保留 MJPEG，隐藏仅支持 H.264 的直接 media WebSocket 选项。
+设回 `VIM4_VIDEO_CODEC=h264` 并重启即可恢复默认。EDID/HDR 使用已有板级工具与管理器。
 本地镜像上传、下载与挂载使用原生业务；远端 NBD 直连、USB 麦克风、USB 网卡管理、
 树莓派整机更新与可选扩展服务不在本次板级集成中，不能通过上游固件更新 VIM4。

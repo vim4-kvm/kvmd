@@ -14,6 +14,7 @@ RuntimeDirectoryMode=0700
 # Keep video IPC independent of logind's cleanup when khadas logs out.
 TemporaryFileSystem=/dev/shm:rw,nosuid,nodev,mode=1777
 Environment=KVMD_PLATFORM=vim4
+EnvironmentFile=-/etc/default/vim4-pikvm
 Environment=GST_PLUGIN_PATH=/usr/lib/vim4-kvm/gstreamer-1.0
 Environment=GST_REGISTRY=/var/lib/kvmd/gstreamer-registry.bin
 Environment=PATH=/opt/vim4-pikvm/python/bin:/usr/sbin:/usr/bin:/sbin:/bin

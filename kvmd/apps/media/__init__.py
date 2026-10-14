@@ -22,6 +22,7 @@
 
 from ...clients.streamer import StreamerFormats
 from ...clients.streamer import MemsinkStreamerClient
+from ... import env
 
 from .. import init
 
@@ -42,6 +43,6 @@ def main() -> None:
         return None
 
     MediaServer(
-        h264_streamer=make_streamer("h264", StreamerFormats.H264),
+        h264_streamer=None if env.VIM4_H265 else make_streamer("h264", StreamerFormats.H264),
         jpeg_streamer=make_streamer("jpeg", StreamerFormats.JPEG),
     ).run(**config.server._unpack())

@@ -23,6 +23,7 @@
 import copy
 
 from ....logging import get_logger
+from .... import env
 
 
 # =====
@@ -96,6 +97,7 @@ class Params:
 
     def get_features(self) -> dict:
         return {
+            **({"video_codec": "h265" if env.VIM4_H265 else "h264"} if env.VIM4 else {}),
             self.__QUALITY: self.__has_quality,
             self.__RESOLUTION: self.__has_resolution,
             self.__H264: self.__has_h264,

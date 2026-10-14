@@ -1,10 +1,13 @@
 #!/opt/vim4-pikvm/python/bin/python3.14
 """Keep the PiKVM processes in one systemd lifecycle and stop on child failure."""
 import asyncio
+import os
 import signal
 
 
 async def main():
+    if os.environ.get('VIM4_VIDEO_CODEC', 'h264') not in ('h264', 'h265'):
+        raise ValueError('VIM4_VIDEO_CODEC must be h264 or h265')
     stopped = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):

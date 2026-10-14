@@ -22,6 +22,9 @@ kvmd:
             default: 12000
             min: 1000
             max: 60000
+        h264_gop:
+            default: 30
+            min: 1
         cmd:
             - /usr/bin/ustreamer
             - --unix={unix}

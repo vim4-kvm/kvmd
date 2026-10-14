@@ -30,3 +30,4 @@ ETC_PREFIX:    Final[str] = ""
 SYSFS_PREFIX:  Final[str] = ""
 PROCFS_PREFIX: Final[str] = ""
 VIM4:         Final[bool] = (os.environ.get("KVMD_PLATFORM") == "vim4")
+VIM4_H265:    Final[bool] = VIM4 and os.environ.get("VIM4_VIDEO_CODEC") == "h265"

@@ -265,7 +265,7 @@ export function Streamer() {
 			let sup_h264 = $("stream-video").canPlayType("video/mp4; codecs=\"avc1.42E01F\"");
 			let sup_vd = MediaStreamer.is_videodecoder_available();
 			let sup_webrtc = JanusStreamer.is_webrtc_available();
-			let has_media = (f.h264 && sup_vd); // Don't check sup_h264 for sure
+			let has_media = (f.h264 && sup_vd && f.video_codec !== "h265");
 			let has_janus = (__janus_imported && f.h264 && sup_webrtc); // Same
 
 			tools.info(
