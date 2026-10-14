@@ -1,0 +1,125 @@
+#!/usr/bin/python3
+"""Operate only the existing board gadget and PiKVM's private image directory."""
+import json
+import errno
+import os
+from pathlib import Path
+import stat
+import sys
+
+GADGET = Path('/sys/kernel/config/usb_gadget/kvm')
+PROFILE = GADGET / 'configs/c.1'
+LUN = GADGET / 'functions/mass_storage.disk0/lun.0'
+IMAGES = Path('/var/lib/kvmd/msd')
+STATE = Path('/run/vim4-pikvm-usb/state.json')
+DISK = 'mass_storage.disk0'
+NETWORK = 'ncm.usb0'
+
+
+def write(name, value):
+    (LUN / name).write_text(value + '\n')
+
+
+def prepare():
+    if (LUN / 'file').read_text().strip():
+        raise ValueError('Eject the existing virtual disk before switching to PiKVM')
+    if STATE.exists():
+        restore()  # Recover a previous failed stop after the host has ejected.
+    links = {p.name for p in PROFILE.iterdir() if p.is_symlink()}
+    allowed = {'hid.keyboard', 'hid.mouse_abs', 'hid.mouse_rel', DISK, NETWORK}
+    if not links <= allowed:
+        raise ValueError('Unsupported active USB function; restore the board profile first')
+    STATE.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    snapshot = {
+        'disk': DISK in links, 'network': NETWORK in links,
+        'udc': (GADGET / 'UDC').read_text().strip(),
+        'ro': (LUN / 'ro').read_text().strip(),
+        'cdrom': (LUN / 'cdrom').read_text().strip(),
+    }
+    STATE.write_text(json.dumps(snapshot))
+    try:
+        if snapshot['network'] or not snapshot['disk']:
+            (GADGET / 'UDC').write_text('\n')
+            (PROFILE / NETWORK).unlink(missing_ok=True)
+            if not snapshot['disk']:
+                (PROFILE / DISK).symlink_to(GADGET / 'functions' / DISK)
+            (GADGET / 'UDC').write_text(snapshot['udc'] + '\n')
+    except Exception:
+        restore()
+        raise
+
+
+def restore():
+    if not STATE.exists():
+        return
+    snapshot = json.loads(STATE.read_text())
+    write('file', '')
+    if snapshot['network'] or not snapshot['disk']:
+        (GADGET / 'UDC').write_text('\n')
+        if not snapshot['disk']:
+            (PROFILE / DISK).unlink(missing_ok=True)
+        if snapshot['network'] and not (PROFILE / NETWORK).is_symlink():
+            (PROFILE / NETWORK).symlink_to(GADGET / 'functions' / NETWORK)
+        (GADGET / 'UDC').write_text(snapshot['udc'] + '\n')
+    write('ro', snapshot['ro'])
+    write('cdrom', snapshot['cdrom'])
+    STATE.unlink()
+
+
+def insert(path):
+    relative = Path(path).relative_to(IMAGES)
+    if not relative.parts or any(part in ('.', '..') for part in relative.parts):
+        raise ValueError('Image must be inside PiKVM storage')
+    # Open every component without following links, then let configfs resolve the
+    # pinned descriptor. A concurrent rename cannot substitute another inode.
+    directory = os.open(IMAGES, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        for part in relative.parts[:-1]:
+            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
+            os.close(directory)
+            directory = child
+        fd = os.open(relative.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+        try:
+            metadata = os.fstat(fd)
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
+                raise ValueError('Image must be a regular file with one link')
+            write('file', f'/proc/self/fd/{fd}')
+        finally:
+            os.close(fd)
+    finally:
+        os.close(directory)
+
+
+def main(args):
+    if args == ['prepare']:
+        prepare()
+    elif args == ['restore']:
+        restore()
+    elif len(args) == 2 and args[0] in ('file', 'forced_eject', 'ro', 'cdrom', 'notify'):
+        if not STATE.exists():
+            raise ValueError('PiKVM does not own the virtual disk')
+        name, value = args
+        if name == 'notify' and not value:
+            with (LUN / 'file').open('r+'):
+                pass
+        elif name in ('ro', 'cdrom') and value in ('0', '1'):
+            write(name, value)
+        elif name in ('file', 'forced_eject') and not value:
+            write('file', '')
+        elif name == 'file':
+            insert(value)
+        else:
+            raise ValueError('Invalid media operation')
+    else:
+        raise ValueError('Invalid media operation')
+
+
+if __name__ == '__main__':
+    try:
+        main(sys.argv[1:])
+    except OSError as error:
+        if error.errno == errno.EBUSY:
+            sys.exit('The USB host has locked the media; eject it on the host first')
+        sys.exit(str(error))
+    except ValueError as error:
+        sys.exit(str(error))

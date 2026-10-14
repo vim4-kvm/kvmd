@@ -1,0 +1,44 @@
+kvmd:
+    hid:
+        type: otg
+        keyboard:
+            device: /dev/hidg0
+        mouse:
+            device: /dev/hidg1
+            horizontal_wheel: false
+        mouse_alt:
+            device: /dev/hidg2
+            horizontal_wheel: false
+    atx:
+        type: disabled
+    msd:
+        type: otg
+        remount_cmd: [/usr/bin/true]
+    streamer:
+        desired_fps:
+            default: 60
+            max: 60
+        h264_bitrate:
+            default: 12000
+            min: 1000
+            max: 60000
+        cmd:
+            - /usr/bin/ustreamer
+            - --unix={unix}
+            - --unix-rm
+            - --unix-mode=0600
+            - --quality={quality}
+            - --desired-fps={desired_fps}
+            - --h264-bitrate={h264_bitrate}
+            - --h264-gop={h264_gop}
+            - --jpeg-sink=kvmd::ustreamer::jpeg
+            - --jpeg-sink-mode=0600
+            - --h264-sink=kvmd::ustreamer::h264
+            - --h264-sink-mode=0600
+            - --exit-on-parent-death
+            - --notify-parent
+            - --no-log-colors
+media:
+    memsink:
+        h264:
+            sink: kvmd::ustreamer::h264

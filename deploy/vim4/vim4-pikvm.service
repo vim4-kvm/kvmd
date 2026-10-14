@@ -1,0 +1,28 @@
+[Unit]
+Description=PiKVM for Khadas VIM4
+Requires=vim4-kvm-hdmi.service vim4-kvm-gadget.service
+After=network-online.target vim4-kvm-hdmi.service vim4-kvm-gadget.service
+Conflicts=nanokvm.service vim4-kvm.service one-kvm.service
+
+[Service]
+Type=simple
+User=khadas
+Group=khadas
+SupplementaryGroups=video audio
+RuntimeDirectory=kvmd
+RuntimeDirectoryMode=0700
+# Keep video IPC independent of logind's cleanup when khadas logs out.
+TemporaryFileSystem=/dev/shm:rw,nosuid,nodev,mode=1777
+Environment=KVMD_PLATFORM=vim4
+Environment=GST_PLUGIN_PATH=/usr/lib/vim4-kvm/gstreamer-1.0
+Environment=GST_REGISTRY=/var/lib/kvmd/gstreamer-registry.bin
+Environment=PATH=/opt/vim4-pikvm/python/bin:/usr/sbin:/usr/bin:/sbin:/bin
+UMask=0077
+ExecStartPre=+/usr/libexec/vim4-pikvm-media prepare
+ExecStart=/usr/libexec/vim4-pikvm-run
+ExecStopPost=+/usr/libexec/vim4-pikvm-media restore
+KillMode=control-group
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -140,6 +140,8 @@ class HealthInfoSubmanager(BaseInfoSubmanager):
             }
 
     async def __get_throttling(self) -> (dict | None):
+        if env.VIM4:
+            return None  # Raspberry Pi firmware flags have no VIM4 equivalent.
         # https://www.raspberrypi.org/forums/viewtopic.php?f=63&t=147781&start=50#p972790
         flags = await self.__parse_vcgencmd(
             arg="get_throttled",

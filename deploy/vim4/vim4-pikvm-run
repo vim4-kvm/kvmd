@@ -1,0 +1,50 @@
+#!/opt/vim4-pikvm/python/bin/python3.14
+"""Keep the PiKVM processes in one systemd lifecycle and stop on child failure."""
+import asyncio
+import signal
+
+
+async def main():
+    stopped = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stopped.set)
+    commands = [
+        ['/opt/vim4-pikvm/python/bin/kvmd', '--run'],
+        ['/opt/vim4-pikvm/python/bin/kvmd-media', '--run'],
+        ['/usr/bin/janus', '--disable-colors', '--plugins-folder=/usr/lib/ustreamer/janus',
+         '--configs-folder=/etc/kvmd/janus'],
+        ['/opt/vim4-pikvm/bin/nginx', '-c', '/etc/kvmd/nginx/vim4.conf', '-g', 'daemon off;'],
+    ]
+    children = []
+    tasks = []
+    try:
+        for command in commands:
+            children.append(await asyncio.create_subprocess_exec(*command))
+        tasks = [asyncio.create_task(child.wait()) for child in children]
+        tasks.append(asyncio.create_task(stopped.wait()))
+        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        if not stopped.is_set():
+            failed = [f'{command[0]} (exit {child.returncode})'
+                      for command, child in zip(commands, children) if child.returncode is not None]
+            raise RuntimeError('PiKVM component exited: ' + ', '.join(failed))
+    finally:
+        for child in children:
+            if child.returncode is None:
+                try:
+                    child.terminate()
+                except ProcessLookupError:
+                    pass
+        for child in children:
+            try:
+                await asyncio.wait_for(child.wait(), timeout=10)
+            except TimeoutError:
+                child.kill()
+                await child.wait()
+        for task in tasks:
+            task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+if __name__ == '__main__':
+    asyncio.run(main())

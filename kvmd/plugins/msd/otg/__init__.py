@@ -44,6 +44,7 @@ from ....nbd.types import NbdImage
 from ....validators.os import valid_command
 
 from .... import tools
+from .... import env
 from .... import aiotools
 
 from .. import MsdIsBusyError
@@ -523,6 +524,13 @@ class Plugin(BaseMsd):  # pylint: disable=too-many-instance-attributes
             async with self.__state.locked_only():
                 await self.__storage.reload_parts()
             self.__nr.notify()
+
+        if env.VIM4 and not vd_changed:
+            # The vendor 5.15 gadget closes its backing file on host eject
+            # without an inotify event. Reconcile on the existing watcher tick.
+            async with self.__state.locked_only():
+                if self.__state.vd and self.__state.vd.connected != bool(self.__drive.get_image_path()):
+                    await self.__update_vd()
 
         return False
 

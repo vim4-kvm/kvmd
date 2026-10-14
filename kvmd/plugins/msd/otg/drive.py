@@ -22,8 +22,10 @@
 
 import os
 import errno
+import subprocess
 
 from .... import usb
+from .... import env
 
 from .. import MsdOperationError
 
@@ -53,6 +55,10 @@ def is_cdromable(size: int) -> bool:
 class Drive:
     def __init__(self, instance: int, lun: int) -> None:
         func = f"mass_storage.usb{instance}"
+        if env.VIM4:
+            if instance != 0 or lun != 0:
+                raise ValueError("VIM4 provides one mass-storage LUN")
+            func = "mass_storage.disk0"
         self.__profile_func_path = usb.get_gadget_path(usb.G_PROFILE, func)
         self.__profile_path = usb.get_gadget_path(usb.G_PROFILE)
         self.__lun_path = usb.get_gadget_path(usb.G_FUNCTIONS, func, f"lun.{lun}")
@@ -73,6 +79,9 @@ class Drive:
     # =====
 
     def trigger_image_inotify(self) -> None:
+        if env.VIM4:
+            self.__vim4_helper("notify", "")
+            return
         with open(os.path.join(self.__lun_path, "file"), "r+"):
             pass
 
@@ -112,6 +121,9 @@ class Drive:
             return file.read().strip()
 
     def __set_param(self, param: str, value: str) -> None:
+        if env.VIM4:
+            self.__vim4_helper(param, value)
+            return
         try:
             with open(os.path.join(self.__lun_path, param), "w") as file:
                 file.write(value + "\n")
@@ -119,3 +131,10 @@ class Drive:
             if ex.errno == errno.EBUSY:
                 raise MsdLockedError()
             raise
+
+    def __vim4_helper(self, param: str, value: str) -> None:
+        result = subprocess.run([
+            "/usr/bin/sudo", "-n", "/usr/libexec/vim4-pikvm-media", param, value,
+        ], capture_output=True, text=True, timeout=15, check=False)
+        if result.returncode:
+            raise MsdOperationError(result.stderr.strip() or "VIM4 media operation failed")

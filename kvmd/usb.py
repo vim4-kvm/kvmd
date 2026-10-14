@@ -28,7 +28,7 @@ from . import env
 
 
 # =====
-GADGET:         Final[str] = "kvmd"
+GADGET:         Final[str] = ("kvm" if env.VIM4 else "kvmd")
 G_UDC:          Final[str] = "UDC"
 G_FUNCTIONS:    Final[str] = "functions"
 G_PROFILE_NAME: Final[str] = "c.1"

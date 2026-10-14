@@ -43,6 +43,8 @@ class Partition:
 
 # =====
 def find_msd() -> Partition:
+    if env.VIM4:
+        return Partition("/", "/var/lib/kvmd/msd", "khadas", "khadas")
     return _find_single("otgmsd")
 
 

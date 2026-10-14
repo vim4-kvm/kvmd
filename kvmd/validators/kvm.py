@@ -22,6 +22,8 @@
 
 from typing import Any
 
+from .. import env
+
 from . import add_validator_magic
 from . import raise_error
 from . import check_string_in_list
@@ -99,7 +101,7 @@ def valid_stream_resolution(arg: Any) -> str:
 
 @add_validator_magic(16)
 def valid_stream_h264_bitrate(arg: Any) -> int:
-    return int(valid_number(arg, min=25, max=20000, name="stream H264 bitrate"))
+    return int(valid_number(arg, min=25, max=(60000 if env.VIM4 else 20000), name="stream H264 bitrate"))
 
 
 @add_validator_magic(16)

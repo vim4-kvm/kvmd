@@ -1,0 +1,7 @@
+video: {
+    sink = "kvmd::ustreamer::h264"
+}
+acap: {
+    device = "hw:AMLAUGESOUND,0"
+    sampling_rate = 48000
+}

@@ -72,7 +72,7 @@ class SystemInfoSubmanager(BaseInfoSubmanager):
                 for field in ["system", "release", "version", "machine"]
             },
             "platform": {
-                "type": "rpi",
+                "type": ("vim4" if env.VIM4 else "rpi"),
                 "base": base,
                 "serial": serial,
                 **pl,  # type: ignore

@@ -20,6 +20,8 @@
 # ========================================================================== #
 
 
+import os
+
 from typing import Final
 
 
@@ -27,3 +29,4 @@ from typing import Final
 ETC_PREFIX:    Final[str] = ""
 SYSFS_PREFIX:  Final[str] = ""
 PROCFS_PREFIX: Final[str] = ""
+VIM4:         Final[bool] = (os.environ.get("KVMD_PLATFORM") == "vim4")
