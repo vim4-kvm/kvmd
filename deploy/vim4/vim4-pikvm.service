@@ -1,7 +1,7 @@
 [Unit]
 Description=PiKVM for Khadas VIM4
-Requires=vim4-kvm-hdmi.service vim4-kvm-gadget.service
-After=network-online.target vim4-kvm-hdmi.service vim4-kvm-gadget.service
+Requires=vim4-kvm-hdmi.service vim4-kvm-gadget.service vim4-kvm-pd.service
+After=network-online.target vim4-kvm-hdmi.service vim4-kvm-gadget.service vim4-kvm-pd.service
 Conflicts=nanokvm.service vim4-kvm.service one-kvm.service
 
 [Service]
