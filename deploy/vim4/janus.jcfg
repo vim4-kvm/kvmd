@@ -1,0 +1,21 @@
+general: {
+    debug_level = 4
+}
+nat: {
+    nice_debug = false
+    ignore_mdns = true
+    # Evaluate candidate pairs before nomination. Aggressive nomination can send
+    # video over Wi-Fi IPv6 even when the browser reports a wired IPv4 pair.
+    ice_nomination = "regular"
+}
+media: {
+    ipv6 = true
+    ipv6_linklocal = true
+    min_nack_queue = 2000
+    rtp_port_range = "20000-40000"
+    no_media_timer = 0
+    slowlink_threshold = 10
+    twcc_period = 100
+    dtls_timeout = 1000
+    nack_optimizations = true
+}

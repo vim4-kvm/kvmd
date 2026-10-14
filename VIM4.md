@@ -54,5 +54,8 @@ PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pik
 这是整组服务的启动配置，所有观看者共用一个编码器；不支持按观看者自动切换编码。
 H.265 模式保留 MJPEG，隐藏仅支持 H.264 的直接 media WebSocket 选项。
 设回 `VIM4_VIDEO_CODEC=h264` 并重启即可恢复默认。EDID/HDR 使用已有板级工具与管理器。
+Janus 使用 regular ICE nomination，保留 IPv4/IPv6。双网卡客户端上 aggressive
+nomination 曾将视频发往 Wi-Fi IPv6，而浏览器统计报告有线 IPv4；定位网络卡顿时
+需要核对实际收包接口，不能仅凭网页地址或 selected candidate pair 判断视频路径。
 本地镜像上传、下载与挂载使用原生业务；远端 NBD 直连、USB 麦克风、USB 网卡管理、
 树莓派整机更新与可选扩展服务不在本次板级集成中，不能通过上游固件更新 VIM4。
