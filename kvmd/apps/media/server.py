@@ -98,6 +98,7 @@ class MediaServer(HttpServer):
         self,
         h264_streamer: (BaseStreamerClient | None),
         jpeg_streamer: (BaseStreamerClient | None),
+        h265_streamer: (BaseStreamerClient | None)=None,
     ) -> None:
 
         super().__init__()
@@ -107,6 +108,8 @@ class MediaServer(HttpServer):
             self.__media[self.__T_VIDEO][self.__F_H264] = _Source(h264_streamer, {"profile_level_id": "42E01F"})
         if jpeg_streamer:
             self.__media[self.__T_VIDEO][self.__F_JPEG] = _Source(jpeg_streamer)
+        if h265_streamer:
+            self.__media[self.__T_VIDEO]["h265"] = _Source(h265_streamer)
 
     # ===== HTTP
 

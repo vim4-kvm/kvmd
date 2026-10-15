@@ -318,12 +318,26 @@
                           <label for="stream-mode-radio-janus">WebRTC<br>H.264</label>
                           <input type="radio" id="stream-mode-radio-media" name="stream-mode-radio" value="media">
                           <label for="stream-mode-radio-media">Direct<br>H.264</label>
+                          <input type="radio" id="stream-mode-radio-janus-h265" name="stream-mode-radio" value="janus-h265">
+                          <label for="stream-mode-radio-janus-h265">WebRTC<br>H.265</label>
+                          <input type="radio" id="stream-mode-radio-media-h265" name="stream-mode-radio" value="media-h265">
+                          <label for="stream-mode-radio-media-h265">Direct<br>H.265</label>
                           <input type="radio" id="stream-mode-radio-mjpeg" name="stream-mode-radio" value="mjpeg" checked>
                           <label for="stream-mode-radio-mjpeg">Legacy<br>MJPEG</label>
                     </div>
               </td>
             </tr>
           </table>
+          <div class="hidden" id="stream-codec-shared">
+                <div class="text">
+                  <table>
+                    <tr>
+                      <td rowspan="2"><img class="sign " src="../share/svg/warning.svg"></td>
+                      <td style="line-height:1.5"><b>Changing H.264/H.265 reconnects all viewers. Direct mode has no audio.</b></td>
+                    </tr>
+                  </table>
+                </div>
+          </div>
               <details>
                 <summary>Video settings</summary>
                 <div class="spoiler">

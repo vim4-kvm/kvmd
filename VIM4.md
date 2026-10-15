@@ -9,7 +9,7 @@
 | 功能 | 接口 |
 |---|---|
 | 视频 | VIM4 uStreamer：vfmcapsrc → DMA → amlvenc / vim4jpegenc |
-| 浏览器视频 | Janus H.264/H.265 WebRTC、原生 H.264 media WebSocket、MJPEG |
+| 浏览器视频 | Janus H.264/H.265 WebRTC、H.264/H.265 Direct WebSocket、MJPEG |
 | HDMI 声音 | Janus uStreamer 插件，ALSA hw:AMLAUGESOUND,0，48 kHz |
 | 键盘、绝对鼠标、相对鼠标 | hidg0、hidg1、hidg2；与板级报告长度匹配，关闭水平滚轮 |
 | 本地虚拟介质 | 板级 mass_storage.disk0/lun.0；镜像存储在 /var/lib/kvmd/msd |
@@ -49,14 +49,25 @@ PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pik
 验证包括 Janus 插件实际挂载/卸载、服务配置和动态库解析；软件通过不代表上板通过。
 硬件证据见公共工作区 `docs/bringup-log.md`。
 
+视频切换回归在构建环境运行 `python3 -m unittest discover -s deploy/vim4 -p 'test_*.py'`；
+HEVC SPS 解析运行 `node --test deploy/vim4/test_stream_hevc.mjs`。
+`node deploy/vim4/test_direct_browser.mjs /path/to/recording.h265` 使用以关键帧开头的
+Annex B 录像，在本机 Chrome 验证真实 Direct 解码、重连和菜单切换，不访问板子。
+需要 Playwright（可通过 `PLAYWRIGHT_MODULE` 指定已有模块路径）和 Chrome。
+
 ## 边界
 
 当前输出尺寸跟随 HDMI 输入，视频帧率可限制，H.264 码率范围 1000–60000 kbps。
-默认 H.264，关键帧间隔 30 帧。可在 `/etc/default/vim4-pikvm` 设置
-`VIM4_VIDEO_CODEC=h265` 并重启服务，启用 H.265 WebRTC；需浏览器支持 HEVC WebRTC。
-这是整组服务的启动配置，所有观看者共用一个编码器；不支持按观看者自动切换编码。
-H.265 模式保留 MJPEG，隐藏仅支持 H.264 的直接 media WebSocket 选项。
-设回 `VIM4_VIDEO_CODEC=h264` 并重启即可恢复默认。EDID/HDR 使用已有板级工具与管理器。
+默认 H.264，关键帧间隔 30 帧。网页 Video mode 提供 WebRTC H.264、Direct H.264、
+WebRTC H.265、Direct H.265 和 MJPEG。H.265 分别要求浏览器支持 HEVC WebRTC 或
+HEVC WebCodecs；Direct 使用 HTTPS（或 localhost 安全上下文），两种 Direct 均不传音频。
+所有观看者共用编码器：切换 H.264/H.265 会重启采集编码、Janus 和 media 服务，
+所有观看者短暂重连；认证、键鼠和虚拟介质服务保持运行。其他观看者跟随当前编码，
+保留各自的 WebRTC/Direct/MJPEG 传输选择，不会因刷新页面覆盖共享编码。
+选择保存在 `/var/lib/kvmd/video-codec`，优先于 `/etc/default/vim4-pikvm` 的
+`VIM4_VIDEO_CODEC` 启动默认值；删除该状态文件后重启服务可恢复启动默认值。
+Direct H.265 从关键帧 SPS 读取解码 profile/level，并等待包含参数集的关键帧开始播放。
+EDID/HDR 使用已有板级工具与管理器。上述新菜单与 Direct H.265 仍需部署后做硬件验收。
 Janus 使用 regular ICE nomination，保留 IPv4/IPv6。双网卡客户端上 aggressive
 nomination 曾将视频发往 Wi-Fi IPv6，而浏览器统计报告有线 IPv4；定位网络卡顿时
 需要核对实际收包接口，不能仅凭网页地址或 selected candidate pair 判断视频路径。

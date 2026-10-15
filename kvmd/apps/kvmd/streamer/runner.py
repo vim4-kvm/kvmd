@@ -22,12 +22,15 @@
 
 import asyncio
 import asyncio.subprocess
+import os
 
 from ....logging import get_logger
 
 from .... import tools
 from .... import aiotools
 from .... import aioproc
+from .... import env
+from .... import vim4video
 
 
 # =====
@@ -173,7 +176,12 @@ class Runner:  # pylint: disable=too-many-instance-attributes
     async def __start_process(self) -> None:
         assert self.__proc is None
         cmd = self.__make_cmd(self.__cmd)
-        self.__proc = await aioproc.run_process(cmd)
+        child_env = None
+        if env.VIM4:
+            child_env = dict(os.environ, VIM4_VIDEO_CODEC=vim4video.read_codec(
+                os.environ.get("VIM4_VIDEO_CODEC", "h264"),
+            ))
+        self.__proc = await aioproc.run_process(cmd, env=child_env)
         get_logger(0).info("Started streamer pid=%d: %s", self.__proc.pid, tools.cmdfmt(cmd))
 
     async def __kill_process(self) -> None:

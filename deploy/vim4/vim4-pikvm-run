@@ -4,30 +4,60 @@ import asyncio
 import os
 import signal
 
+from kvmd.vim4video import read_codec
+
 
 async def main():
-    if os.environ.get('VIM4_VIDEO_CODEC', 'h264') not in ('h264', 'h265'):
-        raise ValueError('VIM4_VIDEO_CODEC must be h264 or h265')
+    default_codec = os.environ.get('VIM4_VIDEO_CODEC', 'h264')
     stopped = asyncio.Event()
+    reload_requested = asyncio.Event()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGINT, signal.SIGTERM):
         loop.add_signal_handler(sig, stopped.set)
-    commands = [
+    loop.add_signal_handler(signal.SIGHUP, reload_requested.set)
+    os.environ['VIM4_SUPERVISOR_PID'] = str(os.getpid())
+    os.environ['VIM4_VIDEO_CODEC'] = read_codec(default_codec)
+    persistent_commands = [
         ['/opt/vim4-pikvm/python/bin/kvmd', '--run'],
+        ['/opt/vim4-pikvm/bin/nginx', '-c', '/etc/kvmd/nginx/vim4.conf', '-g', 'daemon off;'],
+    ]
+    video_commands = [
         ['/opt/vim4-pikvm/python/bin/kvmd-media', '--run'],
         ['/usr/bin/janus', '--disable-colors', '--plugins-folder=/usr/lib/ustreamer/janus',
          '--configs-folder=/etc/kvmd/janus'],
-        ['/opt/vim4-pikvm/bin/nginx', '-c', '/etc/kvmd/nginx/vim4.conf', '-g', 'daemon off;'],
     ]
+    tasks = [
+        asyncio.create_task(run_components(persistent_commands, stopped, asyncio.Event())),
+        asyncio.create_task(run_video_components(video_commands, stopped, reload_requested, default_codec)),
+    ]
+    try:
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        for task in done:
+            task.result()
+    finally:
+        stopped.set()
+        await asyncio.gather(*tasks, return_exceptions=True)
+
+
+async def run_video_components(commands, stopped, reload_requested, default_codec):
+    # Keep authentication, HID and media mounting alive during a codec change.
+    while not stopped.is_set():
+        reload_requested.clear()
+        child_env = dict(os.environ, VIM4_VIDEO_CODEC=read_codec(default_codec))
+        await run_components(commands, stopped, reload_requested, child_env)
+
+
+async def run_components(commands, stopped, reload_requested, child_env=None):
     children = []
     tasks = []
     try:
         for command in commands:
-            children.append(await asyncio.create_subprocess_exec(*command))
+            children.append(await asyncio.create_subprocess_exec(*command, env=child_env))
         tasks = [asyncio.create_task(child.wait()) for child in children]
         tasks.append(asyncio.create_task(stopped.wait()))
+        tasks.append(asyncio.create_task(reload_requested.wait()))
         await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-        if not stopped.is_set():
+        if not stopped.is_set() and not reload_requested.is_set():
             failed = [f'{command[0]} (exit {child.returncode})'
                       for command, child in zip(commands, children) if child.returncode is not None]
             raise RuntimeError('PiKVM component exited: ' + ', '.join(failed))

@@ -40,6 +40,7 @@ export function Streamer() {
 	var __streamer = null;
 
 	var __state = null;
+	var __switching_codec = false;
 	var __res = {"width": 640, "height": 480};
 
 	var __init__ = function() {
@@ -242,6 +243,7 @@ export function Streamer() {
 			}
 		} else {
 			__state = null;
+			__switching_codec = false;
 			__setControlsEnabled(false);
 		}
 		__applyState((__isStreamRequired() && __state && __state.features) ? state : null);
@@ -261,12 +263,21 @@ export function Streamer() {
 
 		if (state.features) {
 			let f = state.features;
+			if (__switching_codec === f.video_codec) {
+				__switching_codec = false;
+			}
 			let l = state.limits;
 			let sup_h264 = $("stream-video").canPlayType("video/mp4; codecs=\"avc1.42E01F\"");
 			let sup_vd = MediaStreamer.is_videodecoder_available();
 			let sup_webrtc = JanusStreamer.is_webrtc_available();
-			let has_media = (f.h264 && sup_vd && f.video_codec !== "h265");
+			let has_media = (f.h264 && sup_vd);
 			let has_janus = (__janus_imported && f.h264 && sup_webrtc); // Same
+			for (let mode of ["janus-h265", "media-h265"]) {
+				let input = $(`stream-mode-radio-${mode}`);
+				tools.hidden.setVisible(input, !!f.h265);
+				tools.hidden.setVisible(document.querySelector(`label[for="${input.id}"]`), !!f.h265);
+			}
+			tools.hidden.setVisible($("stream-codec-shared"), !!f.h265);
 
 			tools.info(
 				`Stream: Janus WebRTC state: features.h264=${f.h264},`
@@ -297,14 +308,20 @@ export function Streamer() {
 			tools.feature.setEnabled($("stream-h264-gop"), f.h264);
 			tools.feature.setEnabled($("stream-mode"), f.h264);
 
-			let mode = tools.storage.get("stream.mode", "janus");
+			let mode = tools.storage.get("stream.mode", "janus").replace("-h265", "");
 			if (mode === "janus" && !has_janus) {
 				mode = "media";
 			}
 			if (mode === "media" && !has_media) {
 				mode = "mjpeg";
 			}
-			tools.radio.clickValue("stream-mode-radio", mode);
+			if (mode !== "mjpeg" && f.video_codec === "h265") {
+				mode += "-h265";
+			}
+			// State from another viewer must follow the encoder, never switch it back.
+			if (!__switching_codec) {
+				__selectMode(mode);
+			}
 		}
 
 		if (state.applied) {
@@ -328,7 +345,7 @@ export function Streamer() {
 			}
 		}
 
-		if (state.streamer) {
+		if (state.streamer && !__switching_codec) {
 			let s = state.streamer;
 			__res = s.source.resolution;
 			__streamer.ensureStream(s);
@@ -388,10 +405,11 @@ export function Streamer() {
 		__streamer.stopStream();
 		let cls = MjpegStreamer;
 		switch (mode) {
-			case "janus": cls = JanusStreamer; break;
-			case "media": cls = MediaStreamer; break;
+			case "janus": case "janus-h265": cls = JanusStreamer; break;
+			case "media": case "media-h265": cls = MediaStreamer; break;
 		}
-		__streamer = new cls(__setActive, __setInactive, __setInfo, __watchHook, __organizeHook);
+		__streamer = new cls(__setActive, __setInactive, __setInfo, __watchHook, __organizeHook,
+			mode.endsWith("-h265") ? "h265" : "h264");
 		if (__isStreamRequired()) {
 			__streamer.ensureStream((__state && __state.streamer !== undefined) ? __state.streamer : null);
 			__applyAudioVolume();
@@ -400,13 +418,61 @@ export function Streamer() {
 		}
 	};
 
-	var __clickModeRadio = function() {
+	var __clickModeRadio = async function() {
 		let mode = tools.radio.getValue("stream-mode-radio");
+		if (__switching_codec) {
+			return;
+		}
+		try {
+			if (mode === "janus-h265") {
+				let caps = window.RTCRtpReceiver?.getCapabilities("video");
+				if (!caps?.codecs.some(codec => codec.mimeType.toLowerCase() === "video/h265")) {
+					throw new Error("This browser does not support WebRTC H.265");
+				}
+			} else if (mode === "media-h265") {
+				if (!window.VideoDecoder) {
+					throw new Error("Direct H.265 requires WebCodecs and HTTPS (or localhost)");
+				}
+				let support = await VideoDecoder.isConfigSupported({"codec": "hev1.1.6.L93.B0"});
+				if (!support.supported) {
+					throw new Error("This browser does not support Direct H.265");
+				}
+			}
+		} catch (ex) {
+			tools.radio.setValue("stream-mode-radio", __streamer.getMode());
+			wm.error("Can't change video mode", String(ex));
+			return;
+		}
+		let codec = (mode.endsWith("-h265") ? "h265" : "h264");
+		if (__switching_codec || mode !== tools.radio.getValue("stream-mode-radio")) {
+			return;
+		}
+		if (mode !== "mjpeg" && __state?.features?.h265 && codec !== __state.features.video_codec) {
+			let previous_mode = __streamer.getMode();
+			__switching_codec = codec;
+			tools.storage.set("stream.mode", mode);
+			__streamer.stopStream();
+			__setInfo(false, false, "Changing video codec; reconnecting ...");
+			tools.httpPost("api/streamer/set_codec", {"codec": codec}, function(http) {
+				if (http.status !== 200) {
+					__switching_codec = false;
+					__selectMode(previous_mode);
+					__resetStream();
+					wm.error("Can't change video codec", http.responseText);
+				}
+			});
+			return;
+		}
+		__selectMode(mode);
+	};
+
+	var __selectMode = function(mode) {
+		tools.radio.setValue("stream-mode-radio", mode);
 		tools.storage.set("stream.mode", mode);
 		if (mode !== __streamer.getMode()) {
-			tools.hidden.setVisible($("stream-canvas"), (mode === "media"));
+			tools.hidden.setVisible($("stream-canvas"), mode.startsWith("media"));
 			tools.hidden.setVisible($("stream-image"), (mode === "mjpeg"));
-			tools.hidden.setVisible($("stream-video"), (mode === "janus"));
+			tools.hidden.setVisible($("stream-video"), mode.startsWith("janus"));
 			__resetStream(mode);
 		}
 	};

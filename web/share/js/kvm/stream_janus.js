@@ -31,7 +31,7 @@ import {wm} from "../wm.js";
 var _Janus = null;
 
 
-export function JanusStreamer(__setActive, __setInactive, __setInfo, __watchHook, __organizeHook) {
+export function JanusStreamer(__setActive, __setInactive, __setInfo, __watchHook, __organizeHook, video_codec="h264") {
 
 	var self = this;
 
@@ -190,7 +190,7 @@ export function JanusStreamer(__setActive, __setInactive, __setInfo, __watchHook
 	};
 
 	self.getName = function() {
-		let name = "WebRTC H.264";
+		let name = (video_codec === "h265" ? "WebRTC H.265" : "WebRTC H.264");
 		if (__has_audio && !!__use_audio) {
 			name += " + Audio";
 		}
@@ -203,7 +203,7 @@ export function JanusStreamer(__setActive, __setInactive, __setInfo, __watchHook
 		}
 		return name;
 	};
-	self.getMode = () => "janus";
+	self.getMode = () => (video_codec === "h265" ? "janus-h265" : "janus");
 
 	self.getResolution = function() {
 		let el = $("stream-video");

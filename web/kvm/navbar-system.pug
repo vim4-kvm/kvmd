@@ -88,8 +88,12 @@ li.right#system-dropdown
 					+menu_radio("stream-mode-radio", [
 						{title: "WebRTC<br>H.264", value: "janus"},
 						{title: "Direct<br>H.264", value: "media"},
+						{title: "WebRTC<br>H.265", value: "janus-h265"},
+						{title: "Direct<br>H.265", value: "media-h265"},
 						{title: "Legacy<br>MJPEG", value: "mjpeg", checked: true},
 					])
+		.hidden#stream-codec-shared
+			+menu_message("warning", "Changing H.264/H.265 reconnects all viewers. Direct mode has no audio.")
 
 		+menu_spoiler("Video settings")
 			table.kv

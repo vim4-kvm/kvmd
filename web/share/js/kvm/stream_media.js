@@ -24,9 +24,10 @@
 
 
 import {tools, $} from "../tools.js";
+import {hevcCodecFromAnnexB} from "./stream_hevc.js";
 
 
-export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook, __organizeHook) {
+export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook, __organizeHook, video_codec="h264") {
 	var self = this;
 
 	/************************************************************************/
@@ -66,8 +67,8 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 	self.setMicRaw = function(raw) {}; // eslint-disable-line no-unused-vars
 	self.setCameraDevice = function(camera) {}; // eslint-disable-line no-unused-vars
 
-	self.getName = () => "Direct H.264";
-	self.getMode = () => "media";
+	self.getName = () => (video_codec === "h265" ? "Direct H.265" : "Direct H.264");
+	self.getMode = () => (video_codec === "h265" ? "media-h265" : "media");
 
 	self.getResolution = function() {
 		return {
@@ -181,25 +182,25 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 
 	var __setupCodec = function(formats) {
 		__closeDecoder();
-		if (formats.h264 === undefined) {
-			let msg = "No H.264 stream available on PiKVM";
+		if (formats[video_codec] === undefined) {
+			let msg = `No ${self.getName()} stream available on PiKVM`;
 			__setInfo(false, false, msg);
 			__logInfo(msg);
 			return;
 		}
 		if (!window.VideoDecoder) {
-			let msg = "This browser can't handle direct H.264 stream";
+			let msg = `This browser can't handle ${self.getName()} stream`;
 			if (!tools.is_https) {
-				msg = "Direct H.264 requires HTTPS";
+				msg = `${self.getName()} requires HTTPS`;
 			}
 			__setInfo(false, false, msg);
 			__logInfo(msg);
 			return;
 		}
-		__codec = `avc1.${formats.h264.profile_level_id}`;
+		__codec = (video_codec === "h265" ? "" : `avc1.${formats.h264.profile_level_id}`);
 		__ws.send(JSON.stringify({
 			"event_type": "start",
-			"event": {"type": "video", "format": "h264"},
+			"event": {"type": "video", "format": video_codec},
 		}));
 	};
 
@@ -209,6 +210,16 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 			__missed_heartbeats = 0;
 		} else if (header[0] === 1) { // Video frame
 			let key = !!header[1];
+			if (key && video_codec === "h265") {
+				let codec = hevcCodecFromAnnexB(new Uint8Array(data, 2));
+				if (!codec) {
+					throw new Error("HEVC keyframe is missing its SPS");
+				}
+				if (codec !== __codec) {
+					__closeDecoder();
+					__codec = codec;
+				}
+			}
 			if (await __ensureDecoder(key)) {
 				await __processFrame(key, data.slice(2));
 			}

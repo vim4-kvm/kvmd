@@ -44,5 +44,6 @@ def main() -> None:
 
     MediaServer(
         h264_streamer=None if env.VIM4_H265 else make_streamer("h264", StreamerFormats.H264),
+        h265_streamer=make_streamer("h264", StreamerFormats.H265) if env.VIM4_H265 else None,
         jpeg_streamer=make_streamer("jpeg", StreamerFormats.JPEG),
     ).run(**config.server._unpack())

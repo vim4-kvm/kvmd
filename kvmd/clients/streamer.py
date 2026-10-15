@@ -61,11 +61,12 @@ class StreamerPermError(StreamerError):
 class StreamerFormats:
     JPEG = 1195724874    # V4L2_PIX_FMT_JPEG
     H264 = 875967048     # V4L2_PIX_FMT_H264
+    H265 = 1129727304    # V4L2_PIX_FMT_HEVC
     _MJPEG = 1196444237  # V4L2_PIX_FMT_MJPEG
 
     @classmethod
     def is_diff(cls, fmt: int) -> bool:
-        return (fmt == cls.H264)
+        return (fmt in (cls.H264, cls.H265))
 
 
 class BaseStreamerClient:
@@ -259,7 +260,7 @@ class MemsinkStreamerClient(BaseStreamerClient):
         with _memsink_reading_handle_errors():
             with ustreamer.Memsink(**self.__kwargs) as sink:
                 async def read_frame(key_required: bool) -> dict:
-                    key_required = (key_required and self.__fmt == StreamerFormats.H264)
+                    key_required = (key_required and StreamerFormats.is_diff(self.__fmt))
                     with _memsink_reading_handle_errors():
                         while True:
                             frame = await asyncio.to_thread(sink.wait_frame, key_required)

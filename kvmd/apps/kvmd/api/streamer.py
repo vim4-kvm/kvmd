@@ -20,12 +20,18 @@
 # ========================================================================== #
 
 
+import os
+import signal
+import asyncio
+
 from aiohttp.web import Request
 from aiohttp.web import Response
 
 from ....htserver import UnavailableError
 from ....htserver import exposed_http
 from ....htserver import make_json_response
+from .... import env
+from .... import vim4video
 
 from ....validators import check_string_in_list
 from ....validators.basic import valid_bool
@@ -44,8 +50,23 @@ class StreamerApi:
     def __init__(self, streamer: Streamer, ocr: Ocr) -> None:
         self.__streamer = streamer
         self.__ocr = ocr
+        self.__codec_lock = asyncio.Lock()
 
     # =====
+
+    @exposed_http("POST", "/streamer/set_codec")
+    async def __set_codec_handler(self, req: Request) -> Response:
+        supervisor = os.environ.get("VIM4_SUPERVISOR_PID")
+        if not env.VIM4 or not supervisor:
+            raise UnavailableError()
+        codec = check_string_in_list(req.query.get("codec", ""), "Video codec", ["h264", "h265"])
+        async with self.__codec_lock:
+            if codec != vim4video.read_codec(os.environ.get("VIM4_VIDEO_CODEC", "h264")):
+                vim4video.write_codec(codec)
+                os.kill(int(supervisor), signal.SIGHUP)
+                await self.__streamer.ensure_restart()
+            await self.__streamer.trigger_state()
+        return make_json_response()
 
     @exposed_http("GET", "/streamer")
     async def __state_handler(self, _: Request) -> Response:
