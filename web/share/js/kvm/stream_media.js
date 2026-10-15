@@ -285,11 +285,13 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 
 	var __renderFrame = function(frame) {
 		if (__frame === null) {
-			__frame = frame;
 			window.requestAnimationFrame(__drawPendingFrame, __canvas);
 		} else {
-			__closeFrame(frame);
+			// Decoded frames are independent: present the freshest one when
+			// several arrive before the next display refresh.
+			__closeFrame(__frame);
 		}
+		__frame = frame;
 	};
 
 	var __drawPendingFrame = function() {

@@ -50,7 +50,8 @@ PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pik
 硬件证据见公共工作区 `docs/bringup-log.md`。
 
 视频切换回归在构建环境运行 `python3 -m unittest discover -s deploy/vim4 -p 'test_*.py'`；
-HEVC SPS 解析运行 `node --test deploy/vim4/test_stream_hevc.mjs`。
+HEVC SPS 解析和 Direct 绘制生命周期运行
+`node --test deploy/vim4/test_stream_hevc.mjs deploy/vim4/test_direct_render.mjs`。
 `node deploy/vim4/test_direct_browser.mjs /path/to/recording.h265` 使用以关键帧开头的
 Annex B 录像，在本机 Chrome 验证真实 Direct 解码、重连和菜单切换，不访问板子。
 需要 Playwright（可通过 `PLAYWRIGHT_MODULE` 指定已有模块路径）和 Chrome。
@@ -67,6 +68,8 @@ HEVC WebCodecs；Direct 使用 HTTPS（或 localhost 安全上下文），两种
 选择保存在 `/var/lib/kvmd/video-codec`，优先于 `/etc/default/vim4-pikvm` 的
 `VIM4_VIDEO_CODEC` 启动默认值；删除该状态文件后重启服务可恢复启动默认值。
 Direct H.265 从关键帧 SPS 读取解码 profile/level，并等待包含参数集的关键帧开始播放。
+Direct 在每次显示刷新时绘制最新已解码帧，释放同一刷新周期内被替代的旧帧；
+编码帧仍按顺序解码，避免破坏帧间依赖。这减少突发到达时显示陈旧画面的延迟。
 Direct 视频 WebSocket 不协商 permessage-deflate：视频已由编码器压缩，再压缩大关键帧
 会延迟发送并积压后续帧，表现为周期性卡顿；控制通道保持原有压缩设置。
 EDID/HDR 使用已有板级工具与管理器。2026-10-15 的 `.50` 包已实板验证四种视频模式的

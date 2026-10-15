@@ -25,6 +25,10 @@ div#navbar-stream-info {
 	font-family: monospace;
 }
 
+div#stream-codec-shared {
+	font-size: 0.8em;
+}
+
 div#stream-window {
 	min-width: 400px;
 	min-height: 200px;
