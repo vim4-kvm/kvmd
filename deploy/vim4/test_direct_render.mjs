@@ -77,7 +77,7 @@ test('A stalled decoder discards stale work and resumes only from a keyframe', a
     await frame(true);
     for (let i = 0; i < 60; i++) await frame(false);
     assert.equal(decoder.resets, 0, 'Slow in-flight decoding must finish instead of being repeatedly canceled');
-    assert.equal(decoder.decodeQueueSize, 3, 'New input must stop at the queue bound');
+    assert.equal(decoder.decodeQueueSize, 6, 'New input must stop at the queue bound');
     decoder.decodeQueueSize = 0; // The stalled decoder finishes its bounded work.
     await frame(false);
     await frame(false);

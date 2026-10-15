@@ -213,7 +213,7 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 			let key = !!header[1];
 			// A slow decoder must catch up at a keyframe, not replay old input.
 			// decode() queues work synchronously; awaiting it provides no backpressure.
-			if (__decoder?.state === "configured" && (__decode_recovering || __decoder.decodeQueueSize >= 3)) {
+			if (__decoder?.state === "configured" && (__decode_recovering || __decoder.decodeQueueSize >= 6)) {
 				__decode_recovering = true;
 				// Let the bounded in-flight work finish before resetting. Repeatedly
 				// canceling a slow keyframe would starve presentation altogether.
