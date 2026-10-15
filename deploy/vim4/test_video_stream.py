@@ -4,6 +4,9 @@ import tempfile
 from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, patch
 
+from aiohttp import web
+from aiohttp.test_utils import TestClient, TestServer
+
 from kvmd import vim4video
 from kvmd.clients.streamer import MemsinkStreamerClient, StreamerFormats, StreamerPermError
 from kvmd.apps.media.server import MediaServer, _Client, _Source
@@ -14,6 +17,20 @@ from kvmd.validators import ValidatorError
 class DirectVideoTest(unittest.IsolatedAsyncioTestCase):
     def make_streamer(self, fmt):
         return MemsinkStreamerClient(fmt, 'test', 1, 1, 0)
+
+    async def test_media_handshake_refuses_deflate_and_preserves_binary_protocol(self):
+        server = MediaServer(None, None, self.make_streamer(StreamerFormats.H265))
+        server._HttpServer__ws_heartbeat = 10
+        app = web.Application()
+        server._HttpServer__app = app
+        server._add_exposed(server)
+        async with TestClient(TestServer(app)) as client:
+            async with client.ws_connect('/ws', compress=15) as ws:
+                self.assertEqual(ws.compress, 0)
+                self.assertNotIn('Sec-WebSocket-Extensions', ws._response.headers)
+                self.assertIn('h265', (await ws.receive_json())['event']['video'])
+                await ws.send_bytes(b'\x00')
+                self.assertEqual(await ws.receive_bytes(timeout=2), b'\xff')
 
     async def test_hevc_requests_keyframes_and_rejects_stale_h264(self):
         streamer = self.make_streamer(StreamerFormats.H265)

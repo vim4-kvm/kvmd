@@ -127,7 +127,9 @@ class MediaServer(HttpServer):
         if v_fmt not in ["", *self.__media[self.__T_VIDEO]]:
             raise ValidatorError("Unsupported video type")
 
-        async with self._ws_session(req, pure=bool(v_fmt)) as ws:
+        # Video is already compressed. Deflating a large keyframe again delays
+        # its delivery and batches the following frames, causing periodic stalls.
+        async with self._ws_session(req, compress=False, pure=bool(v_fmt)) as ws:
             if v_fmt:  # Pure request for simplified API without any info
                 if not self.__start_stream(ws, self.__T_VIDEO, v_fmt):
                     raise RuntimeError("We shouldn't be here")

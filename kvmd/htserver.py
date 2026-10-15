@@ -417,9 +417,9 @@ class HttpServer:
     # =====
 
     @contextlib.asynccontextmanager
-    async def _ws_session(self, req: Request, **kwargs: Any) -> AsyncGenerator[WsSession]:
+    async def _ws_session(self, req: Request, *, compress: bool=True, **kwargs: Any) -> AsyncGenerator[WsSession]:
         assert self.__ws_heartbeat is not None
-        wsr = WebSocketResponse(heartbeat=self.__ws_heartbeat)
+        wsr = WebSocketResponse(heartbeat=self.__ws_heartbeat, compress=compress)
         await wsr.prepare(req)
         ws = WsSession(wsr, _get_request_auth_token(req), kwargs)
 
