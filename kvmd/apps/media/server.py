@@ -65,11 +65,16 @@ class _Client:
     src:    _Source
     sender: asyncio.Task
     _queue: asyncio.Queue[dict] = dataclasses.field(default_factory=(lambda: asyncio.Queue(32)))
+    _needs_keyframe: bool = False
 
     async def get_frame(self) -> dict:
         return (await self._queue.get())
 
     async def put_frame(self, frame: dict) -> bool:  # Overflow/wipe flag
+        if self._needs_keyframe:
+            if not frame["key"]:
+                return False
+            self._needs_keyframe = False
         try:
             self._queue.put_nowait(frame)
         except asyncio.QueueFull:
@@ -80,6 +85,11 @@ class _Client:
                     self._queue.get_nowait()
                 except asyncio.QueueEmpty:
                     break
+            # Inter frames after a discarded GOP cannot be decoded safely.
+            self._needs_keyframe = self.src.is_diff()
+            if frame["key"] or not self._needs_keyframe:
+                self._queue.put_nowait(frame)
+                self._needs_keyframe = False
             return True
         except Exception:
             pass

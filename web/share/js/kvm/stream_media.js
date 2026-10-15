@@ -210,6 +210,16 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 			__missed_heartbeats = 0;
 		} else if (header[0] === 1) { // Video frame
 			let key = !!header[1];
+			// A slow decoder must catch up at a keyframe, not replay old input.
+			// decode() queues work synchronously; awaiting it provides no backpressure.
+			if (__decoder?.state === "configured" && __decoder.decodeQueueSize >= 3) {
+				__decoder.reset();
+				if (__frame !== null) {
+					__closeFrame(__frame);
+					__frame = null;
+				}
+				__ws.send(new Uint8Array([1]));
+			}
 			if (key && video_codec === "h265") {
 				let codec = hevcCodecFromAnnexB(new Uint8Array(data, 2));
 				if (!codec) {
@@ -262,7 +272,7 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 			"type": (key ? "key" : "delta"),
 			"data": raw,
 		});
-		await __decoder.decode(chunk);
+		__decoder.decode(chunk);
 	};
 
 	var __closeDecoder = function() {

@@ -18,6 +18,18 @@ class DirectVideoTest(unittest.IsolatedAsyncioTestCase):
     def make_streamer(self, fmt):
         return MemsinkStreamerClient(fmt, 'test', 1, 1, 0)
 
+    async def test_overflow_discards_dependencies_until_a_fresh_keyframe(self):
+        client = _Client(MagicMock(), _Source(self.make_streamer(StreamerFormats.H265)), None)
+        await client.put_frame({'key': True, 'data': b'old-key'})
+        for _ in range(31):
+            await client.put_frame({'key': False, 'data': b'old-delta'})
+        self.assertTrue(await client.put_frame({'key': False, 'data': b'overflow'}))
+        await client.put_frame({'key': False, 'data': b'broken-dependency'})
+        await client.put_frame({'key': True, 'data': b'new-key'})
+        await client.put_frame({'key': False, 'data': b'new-delta'})
+        self.assertEqual((await client.get_frame())['data'], b'new-key')
+        self.assertEqual((await client.get_frame())['data'], b'new-delta')
+
     async def test_media_handshake_refuses_deflate_and_preserves_binary_protocol(self):
         server = MediaServer(None, None, self.make_streamer(StreamerFormats.H265))
         server._HttpServer__ws_heartbeat = 10

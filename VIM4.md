@@ -49,6 +49,10 @@ PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pik
 验证包括 Janus 插件实际挂载/卸载、服务配置和动态库解析；软件通过不代表上板通过。
 硬件证据见公共工作区 `docs/bringup-log.md`。
 
+Direct 播放在解码积压达到三帧时清空过期任务并请求关键帧，等待新关键帧后恢复；
+服务端发送队列溢出也会丢弃旧 GOP 的后续依赖帧。此策略保留分辨率与码率，
+慢客户端会短暂等待关键帧，而不是持续播放积压画面。它不能消除 TCP 内部已缓存的数据。
+
 视频切换回归在构建环境运行 `python3 -m unittest discover -s deploy/vim4 -p 'test_*.py'`；
 HEVC SPS 解析和 Direct 绘制生命周期运行
 `node --test deploy/vim4/test_stream_hevc.mjs deploy/vim4/test_direct_render.mjs`。
