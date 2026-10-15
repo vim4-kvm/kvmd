@@ -67,7 +67,9 @@ HEVC WebCodecs；Direct 使用 HTTPS（或 localhost 安全上下文），两种
 选择保存在 `/var/lib/kvmd/video-codec`，优先于 `/etc/default/vim4-pikvm` 的
 `VIM4_VIDEO_CODEC` 启动默认值；删除该状态文件后重启服务可恢复启动默认值。
 Direct H.265 从关键帧 SPS 读取解码 profile/level，并等待包含参数集的关键帧开始播放。
-EDID/HDR 使用已有板级工具与管理器。上述新菜单与 Direct H.265 仍需部署后做硬件验收。
+EDID/HDR 使用已有板级工具与管理器。2026-10-15 的 `.50` 包已实板验证四种视频模式的
+4K 解码、编码切换和刷新重连；Direct 通过 localhost SSH 转发验证。未覆盖长时间运行、
+运动画面端到端延迟及所有浏览器，证据见公共工作区 `docs/bringup-log.md`。
 Janus 使用 regular ICE nomination，保留 IPv4/IPv6。双网卡客户端上 aggressive
 nomination 曾将视频发往 Wi-Fi IPv6，而浏览器统计报告有线 IPv4；定位网络卡顿时
 需要核对实际收包接口，不能仅凭网页地址或 selected candidate pair 判断视频路径。
