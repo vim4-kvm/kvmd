@@ -41,6 +41,7 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 
 	var __codec = "";
 	var __decoder = null;
+	var __decode_recovering = false;
 	var __frame = null;
 	var __canvas = $("stream-canvas");
 	var __ctx = __canvas.getContext("2d");
@@ -212,8 +213,15 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 			let key = !!header[1];
 			// A slow decoder must catch up at a keyframe, not replay old input.
 			// decode() queues work synchronously; awaiting it provides no backpressure.
-			if (__decoder?.state === "configured" && __decoder.decodeQueueSize >= 3) {
+			if (__decoder?.state === "configured" && (__decode_recovering || __decoder.decodeQueueSize >= 3)) {
+				__decode_recovering = true;
+				// Let the bounded in-flight work finish before resetting. Repeatedly
+				// canceling a slow keyframe would starve presentation altogether.
+				if (__decoder.decodeQueueSize > 0) {
+					return;
+				}
 				__decoder.reset();
+				__decode_recovering = false;
 				if (__frame !== null) {
 					__closeFrame(__frame);
 					__frame = null;
@@ -276,6 +284,7 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 	};
 
 	var __closeDecoder = function() {
+		__decode_recovering = false;
 		if (__decoder !== null) {
 			try {
 				__decoder.close();

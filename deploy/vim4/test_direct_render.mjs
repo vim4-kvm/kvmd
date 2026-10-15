@@ -76,8 +76,12 @@ test('A stalled decoder discards stale work and resumes only from a keyframe', a
     const frame = key => socket.onmessage({data: new Uint8Array([1, Number(key), 0]).buffer});
     await frame(true);
     for (let i = 0; i < 60; i++) await frame(false);
-    assert.equal(decoder.resets, 1, 'Backlog should trigger one recovery, not repeatedly reset while waiting');
-    assert.equal(decoder.decodeQueueSize, 0, 'Stale decode work must be discarded');
+    assert.equal(decoder.resets, 0, 'Slow in-flight decoding must finish instead of being repeatedly canceled');
+    assert.equal(decoder.decodeQueueSize, 3, 'New input must stop at the queue bound');
+    decoder.decodeQueueSize = 0; // The stalled decoder finishes its bounded work.
+    await frame(false);
+    await frame(false);
+    assert.equal(decoder.resets, 1, 'Draining triggers one recovery, then waits for a keyframe');
     assert.equal(sent.filter(data => data instanceof Uint8Array && data[0] === 1).length, 1);
     const before = decoded.length;
     await frame(true);
