@@ -22,6 +22,7 @@
 
 import os
 import signal
+from collections.abc import Callable
 import asyncio
 
 from aiohttp.web import Request
@@ -47,10 +48,11 @@ from ..ocr import Ocr
 
 # =====
 class StreamerApi:
-    def __init__(self, streamer: Streamer, ocr: Ocr) -> None:
+    def __init__(self, streamer: Streamer, ocr: Ocr, request_restart: Callable[[], None]) -> None:
         self.__streamer = streamer
         self.__ocr = ocr
         self.__codec_lock = asyncio.Lock()
+        self.__request_restart = request_restart
 
     # =====
 
@@ -64,7 +66,8 @@ class StreamerApi:
             if codec != vim4video.read_codec(os.environ.get("VIM4_VIDEO_CODEC", "h264")):
                 vim4video.write_codec(codec)
                 os.kill(int(supervisor), signal.SIGHUP)
-                await self.__streamer.ensure_restart()
+                # The controller owns start/stop ordering, including viewer reconnects.
+                self.__request_restart()
             await self.__streamer.trigger_state()
         return make_json_response()
 

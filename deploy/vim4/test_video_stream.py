@@ -11,6 +11,8 @@ from kvmd import vim4video
 from kvmd.clients.streamer import MemsinkStreamerClient, StreamerFormats, StreamerPermError
 from kvmd.apps.media.server import MediaServer, _Client, _Source
 from kvmd.apps.kvmd.api.streamer import StreamerApi
+from kvmd.apps.kvmd.server import KvmdServer
+from kvmd.aiotools import AioNotifier
 from kvmd.validators import ValidatorError
 
 
@@ -82,6 +84,46 @@ class DirectVideoTest(unittest.IsolatedAsyncioTestCase):
 
 
 class CodecApiTest(unittest.IsolatedAsyncioTestCase):
+    async def test_codec_restart_waits_for_viewer_start_to_finish(self):
+        started, release, restarted = asyncio.Event(), asyncio.Event(), asyncio.Event()
+        order = []
+
+        async def start():
+            order.append('starting')
+            started.set()
+            await release.wait()
+            order.append('started')
+
+        async def restart():
+            order.append('restart')
+            if order.count('restart') == 1:
+                server._KvmdServer__request_streamer_reset()
+            else:
+                restarted.set()
+
+        server = object.__new__(KvmdServer)
+        server._KvmdServer__get_stream_clients = lambda: 1
+        server._broadcast_ws_event = AsyncMock()
+        server._KvmdServer__snapshoter = MagicMock()
+        server._KvmdServer__stream_forever = False
+        server._KvmdServer__streamer = AsyncMock()
+        server._KvmdServer__streamer.ensure_start.side_effect = start
+        server._KvmdServer__streamer.ensure_restart.side_effect = restart
+        server._KvmdServer__streamer_notifier = AioNotifier()
+        server._KvmdServer__new_streamer_params = {}
+        server._KvmdServer__reset_streamer = False
+        task = asyncio.create_task(server._KvmdServer__stream_controller())
+        try:
+            await asyncio.wait_for(started.wait(), 1)
+            server._KvmdServer__request_streamer_reset()
+            self.assertFalse(restarted.is_set())
+            release.set()
+            await asyncio.wait_for(restarted.wait(), 1)
+            self.assertEqual(order, ['starting', 'started', 'restart', 'restart'])
+        finally:
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+
     async def test_invalid_and_repeated_selections_do_not_restart_video(self):
         root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.enterContext(patch.object(vim4video, 'CODEC_PATH', root / 'video-codec'))
@@ -89,7 +131,8 @@ class CodecApiTest(unittest.IsolatedAsyncioTestCase):
         self.enterContext(patch.dict('os.environ', {'VIM4_SUPERVISOR_PID': '123', 'VIM4_VIDEO_CODEC': 'h264'}))
         signal = self.enterContext(patch('kvmd.apps.kvmd.api.streamer.os.kill'))
         streamer = AsyncMock()
-        api = StreamerApi(streamer, None)
+        request_restart = MagicMock()
+        api = StreamerApi(streamer, None, request_restart)
         req = MagicMock()
         req.query = {'codec': 'invalid'}
         with self.assertRaises(ValidatorError):
@@ -101,5 +144,6 @@ class CodecApiTest(unittest.IsolatedAsyncioTestCase):
         await api._StreamerApi__set_codec_handler(req)
         self.assertEqual(vim4video.read_codec('h264'), 'h265')
         signal.assert_called_once()
-        streamer.ensure_restart.assert_awaited_once()
+        request_restart.assert_called_once_with()
+        streamer.ensure_restart.assert_not_awaited()
         self.assertEqual(streamer.trigger_state.await_count, 2)

@@ -185,7 +185,7 @@ class KvmdServer(HttpServer):  # pylint: disable=too-many-arguments,too-many-ins
             self.__hid_api,
             AtxApi(atx),
             MsdApi(msd),
-            StreamerApi(streamer, ocr),
+            StreamerApi(streamer, ocr, self.__request_streamer_reset),
             SwitchApi(switch),
             ExportApi(im, atx, ugpio),
             RedfishRootApi(),
@@ -233,9 +233,12 @@ class KvmdServer(HttpServer):  # pylint: disable=too-many-arguments,too-many-ins
 
     @exposed_http("POST", "/streamer/reset")
     async def __streamer_reset_handler(self, _: Request) -> Response:
+        self.__request_streamer_reset()
+        return make_json_response()
+
+    def __request_streamer_reset(self) -> None:
         self.__reset_streamer = True
         self.__streamer_notifier.notify()
-        return make_json_response()
 
     # ===== WEBSOCKET
 
@@ -355,8 +358,8 @@ class KvmdServer(HttpServer):  # pylint: disable=too-many-arguments,too-many-ins
                 self.__reset_streamer = True
 
             if self.__reset_streamer:
-                await self.__streamer.ensure_restart()
                 self.__reset_streamer = False
+                await self.__streamer.ensure_restart()
 
             await self.__streamer_notifier.wait()
 
