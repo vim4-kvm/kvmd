@@ -26,6 +26,11 @@ kvmd:
             default: 30
             min: 1
         cmd:
+            # CPU0 handles Ethernet and JPEG IRQs. JPEG work on that CPU can
+            # throttle capture and cause UDP send-buffer errors during playback.
+            - /usr/bin/taskset
+            - --cpu-list
+            - 1-7
             - /usr/bin/ustreamer
             - --unix={unix}
             - --unix-rm
