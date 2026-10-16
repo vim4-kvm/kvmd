@@ -1,11 +1,13 @@
 #!/usr/bin/python3
-"""Operate only the existing board gadget and PiKVM's private image directory."""
+"""Operate the existing board gadget with validated shared catalog images."""
 import json
 import errno
 import os
 from pathlib import Path
-import stat
 import sys
+
+sys.path.insert(0, '/usr/lib/vim4-kvm/python')
+import vim4media
 
 GADGET = Path('/sys/kernel/config/usb_gadget/kvm')
 PROFILE = GADGET / 'configs/c.1'
@@ -67,34 +69,36 @@ def restore():
 
 
 def insert(path):
-    relative = Path(path).relative_to(IMAGES)
-    if not relative.parts or any(part in ('.', '..') for part in relative.parts):
-        raise ValueError('Image must be inside PiKVM storage')
-    # Open every component without following links, then let configfs resolve the
-    # pinned descriptor. A concurrent rename cannot substitute another inode.
-    directory = os.open(IMAGES, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
-    try:
-        for part in relative.parts[:-1]:
-            child = os.open(part, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW, dir_fd=directory)
-            os.close(directory)
-            directory = child
-        fd = os.open(relative.name, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK, dir_fd=directory)
+    identifier = path
+    if Path(path).is_absolute():
+        for source, root in {**vim4media.IMAGE_ROOTS, 'data': vim4media.DATA_DIR}.items():
+            if Path(path).is_relative_to(root):
+                identifier = source + '/' + str(Path(path).relative_to(root))
+                break
+        else:
+            raise ValueError('Image must be in the media catalog')
+    with vim4media.media_locks(wait=True):
+        if (LUN / 'file').read_text().strip():
+            raise ValueError('Eject the existing virtual disk first')
+        fd = vim4media.open_image(identifier, readonly=True)
         try:
-            metadata = os.fstat(fd)
-            if not stat.S_ISREG(metadata.st_mode) or metadata.st_nlink != 1:
-                raise ValueError('Image must be a regular file with one link')
+            write('ro', '1')
+            if not identifier.startswith('pikvm/'):
+                write('cdrom', '1' if identifier.lower().endswith('.iso') else '0')
             write('file', f'/proc/self/fd/{fd}')
         finally:
             os.close(fd)
-    finally:
-        os.close(directory)
 
 
 def main(args):
-    if args == ['prepare']:
-        prepare()
+    if args == ['catalog']:
+        print(json.dumps(vim4media.catalog()))
+    elif args == ['prepare']:
+        with vim4media.media_locks(wait=True):
+            prepare()
     elif args == ['restore']:
-        restore()
+        with vim4media.media_locks(wait=True):
+            restore()
     elif len(args) == 2 and args[0] in ('file', 'forced_eject', 'ro', 'cdrom', 'notify'):
         if not STATE.exists():
             raise ValueError('PiKVM does not own the virtual disk')
@@ -105,7 +109,8 @@ def main(args):
         elif name in ('ro', 'cdrom') and value in ('0', '1'):
             write(name, value)
         elif name in ('file', 'forced_eject') and not value:
-            write('file', '')
+            with vim4media.media_locks(wait=True):
+                write('file', '')
         elif name == 'file':
             insert(value)
         else:

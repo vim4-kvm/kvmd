@@ -1,1 +1,1 @@
-khadas ALL=(root) NOPASSWD: /usr/libexec/vim4-pikvm-media file *, /usr/libexec/vim4-pikvm-media forced_eject *, /usr/libexec/vim4-pikvm-media ro *, /usr/libexec/vim4-pikvm-media cdrom *, /usr/libexec/vim4-pikvm-media notify *
+khadas ALL=(root) NOPASSWD: /usr/libexec/vim4-pikvm-media catalog, /usr/libexec/vim4-pikvm-media file *, /usr/libexec/vim4-pikvm-media forced_eject *, /usr/libexec/vim4-pikvm-media ro *, /usr/libexec/vim4-pikvm-media cdrom *, /usr/libexec/vim4-pikvm-media notify *

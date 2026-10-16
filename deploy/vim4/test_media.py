@@ -4,7 +4,14 @@ from pathlib import Path
 import os
 import tempfile
 import unittest
+import sys
+from contextlib import nullcontext
 from unittest.mock import patch
+
+board_spec = importlib.util.spec_from_file_location('vim4media', Path(__file__).resolve().parents[3] / 'board/vim4media.py')
+vim4media = importlib.util.module_from_spec(board_spec)
+sys.modules['vim4media'] = vim4media
+board_spec.loader.exec_module(vim4media)
 
 loader = importlib.machinery.SourceFileLoader('media', str(Path(__file__).with_name('vim4-pikvm-media')))
 spec = importlib.util.spec_from_loader(loader.name, loader)
@@ -18,15 +25,48 @@ class MediaTest(unittest.TestCase):
         self.images = self.root / 'images'
         self.images.mkdir()
         self.enterContext(patch.object(media, 'IMAGES', self.images))
+        self.enterContext(patch.object(vim4media, 'IMAGE_ROOTS', {'pikvm': self.images}))
+        self.enterContext(patch.object(vim4media, 'media_locks', side_effect=lambda wait=False: nullcontext()))
+        lun = self.root / 'lun'
+        lun.mkdir()
+        (lun / 'file').write_text('')
+        self.enterContext(patch.object(media, 'LUN', lun))
         self.writes = self.enterContext(patch.object(media, 'write'))
 
     def test_insert_pins_regular_image_descriptor(self):
         image = self.images / 'test.iso'
-        image.write_bytes(b'iso contents')
+        image.write_bytes(b'i' * 512)
         observed = []
-        self.writes.side_effect = lambda name, value: observed.append((name, os.read(int(value.rsplit('/', 1)[1]), 100)))
+        self.writes.side_effect = lambda name, value: observed.append((name, os.read(int(value.rsplit('/', 1)[1]), 512))) if name == 'file' else None
         media.insert(str(image))
-        self.assertEqual(observed, [('file', b'iso contents')])
+        self.assertEqual(observed, [('file', b'i' * 512)])
+        self.assertIn(unittest.mock.call('ro', '1'), self.writes.call_args_list)
+
+    def test_occupied_lun_is_not_replaced(self):
+        (media.LUN / 'file').write_text('/other.img')
+        with self.assertRaises(ValueError):
+            media.insert('data/test.img')
+        self.writes.assert_not_called()
+
+    def test_data_edit_lock_and_foreign_flags(self):
+        import fcntl
+        disk = self.images / 'disk.img'
+        disk.write_bytes(b'd' * 512)
+        self.enterContext(patch.object(vim4media, 'DATA_DIR', self.images))
+        with disk.open('r+b') as handle:
+            fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            with self.assertRaisesRegex(ValueError, '正在管理面板中编辑'):
+                media.insert('data/disk.img')
+            self.writes.assert_not_called()
+        media.insert('data/disk.img')
+        self.assertIn(unittest.mock.call('ro', '1'), self.writes.call_args_list)
+        self.assertIn(unittest.mock.call('cdrom', '0'), self.writes.call_args_list)
+
+    def test_lock_contention_prevents_insert(self):
+        vim4media.media_locks.side_effect = BlockingIOError
+        with self.assertRaises(BlockingIOError):
+            media.insert('data/disk.img')
+        self.writes.assert_not_called()
 
     def test_rejects_escape_symlink_directory_and_hardlink(self):
         outside = self.root / 'outside'

@@ -30,6 +30,7 @@ import aiofiles
 import aiofiles.os
 
 from .... import tools
+from .... import env
 from .... import fstab
 from .... import aiohelpers
 
@@ -275,6 +276,18 @@ class Storage:
         self.__root_path = root_path
         self.__images = images
         self.__parts = parts
+        if env.VIM4:
+            await self.reload_catalog()
+
+    async def reload_catalog(self) -> bool:
+        from .vim4 import images, CatalogImage
+        foreign = await images()
+        current = self.__get_images()
+        before = {name: image.size for name, image in current.items() if isinstance(image, CatalogImage)}
+        self.__images = {name: image for name, image in current.items()
+                         if not isinstance(image, CatalogImage)}
+        self.__images.update(foreign)
+        return before != {name: image.size for name, image in foreign.items()}
 
     async def reload_parts(self) -> None:
         await asyncio.gather(*[
@@ -292,6 +305,8 @@ class Storage:
 
     async def make_image(self, name: str) -> FileImage:
         _check_image_name(name)
+        if env.VIM4 and name.startswith("VIM4/"):
+            raise MsdImageExistsError()
         root_path = self.__get_root_path()
         path = os.path.join(root_path, name)
         mnt_path = await fs.find_closest_mountpoint(path)

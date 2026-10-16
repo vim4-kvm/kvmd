@@ -278,7 +278,14 @@ export function Msd() {
 				el.__names_json = names_json;
 			}
 		}
+		const sourceLabels = {data: "共享数据盘", shared: "NanoKVM 镜像", jetkvm: "JetKVM 镜像", onekvm: "One-KVM 镜像"};
+		names.sort((a, b) => (images[a].source || "").localeCompare(images[b].source || ""));
+		let source = "";
 		for (let name of names) {
+			if (images[name].source && images[name].source !== source) {
+				source = images[name].source;
+				tools.selector.addComment(el, sourceLabels[source] || source);
+			}
 			let part = parts[name];
 			let title = (
 				name === ""

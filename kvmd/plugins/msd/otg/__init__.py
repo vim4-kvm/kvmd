@@ -24,6 +24,8 @@ import asyncio
 import contextlib
 import dataclasses
 import copy
+import os
+import time
 
 from typing import Generator
 from typing import AsyncGenerator
@@ -153,6 +155,7 @@ class Plugin(BaseMsd):  # pylint: disable=too-many-instance-attributes
         self.__nr = aiotools.AioNotifier()
         self.__state = _State(self.__nr)
         self.__reset = False
+        self.__catalog_checked = 0.0
 
     @classmethod
     def get_plugin_options(cls) -> dict:
@@ -323,6 +326,11 @@ class Plugin(BaseMsd):  # pylint: disable=too-many-instance-attributes
                 case _:  # None
                     raise MsdImageNotSelected()
 
+            if env.VIM4:
+                vd.rw = False
+                from .vim4 import CatalogImage
+                if isinstance(vd.image, CatalogImage):
+                    vd.cdrom = vd.image.name.lower().endswith(".iso")
             self.__drive.set_rw_flag(vd.rw)
             self.__drive.set_cdrom_flag(vd.cdrom)
             self.__drive.set_image_path(path)
@@ -529,6 +537,12 @@ class Plugin(BaseMsd):  # pylint: disable=too-many-instance-attributes
             # The vendor 5.15 gadget closes its backing file on host eject
             # without an inotify event. Reconcile on the existing watcher tick.
             async with self.__state.locked_only():
+                # The catalog spawns a root helper; keep it off the per-second
+                # tick that shares CPU with uStreamer.
+                if time.monotonic() - self.__catalog_checked >= 10:
+                    self.__catalog_checked = time.monotonic()
+                    if await self.__storage.reload_catalog():
+                        self.__nr.notify()
                 if self.__state.vd and self.__state.vd.connected != bool(self.__drive.get_image_path()):
                     await self.__update_vd()
 
@@ -549,6 +563,15 @@ class Plugin(BaseMsd):  # pylint: disable=too-many-instance-attributes
                 image = self.__nbd.image
             else:
                 image = await self.__storage.get_image_by_path(path)
+                if env.VIM4:
+                    from .vim4 import CatalogImage
+                    previous = self.__state.vd
+                    if isinstance(image, CatalogImage) and not (
+                        previous and previous.connected and isinstance(previous.image, CatalogImage)
+                        and previous.image.path == path
+                    ):
+                        image = FileImage(path, os.path.basename(path), False, False)
+                        await image._reload()
         else:
             if self.__state.vd:
                 image = self.__state.vd.image
