@@ -52,7 +52,7 @@ PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pik
 不改变 Ubuntu 账户。升级保留 htpasswd、TOTP 和 override.yaml。
 
 验证包括 Janus 插件实际挂载/卸载、服务配置和动态库解析；软件通过不代表上板通过。
-硬件证据见公共工作区 `docs/bringup-log.md`。
+硬件证据见公共工作区 `docs/bringup/README.md`（上板记录索引）。
 
 Direct 播放在解码积压达到六帧时停止接受新输入，允许已有解码任务完成后请求关键帧，
 等待新关键帧后恢复，避免反复取消慢解码任务导致一直没有画面；
@@ -84,7 +84,7 @@ Direct 视频 WebSocket 不协商 permessage-deflate：视频已由编码器压�
 会延迟发送并积压后续帧，表现为周期性卡顿；控制通道保持原有压缩设置。
 EDID/HDR 使用已有板级工具与管理器。2026-10-15 的 `.50` 包已实板验证四种视频模式的
 4K 解码、编码切换和刷新重连；Direct 通过 localhost SSH 转发验证。未覆盖长时间运行、
-运动画面端到端延迟及所有浏览器，证据见公共工作区 `docs/bringup-log.md`。
+运动画面端到端延迟及所有浏览器，证据见公共工作区 `docs/bringup/README.md`（上板记录索引）。
 Janus 使用 regular ICE nomination，保留 IPv4/IPv6。双网卡客户端上 aggressive
 nomination 曾将视频发往 Wi-Fi IPv6，而浏览器统计报告有线 IPv4；定位网络卡顿时
 需要核对实际收包接口，不能仅凭网页地址或 selected candidate pair 判断视频路径。
