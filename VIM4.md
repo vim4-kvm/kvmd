@@ -15,7 +15,8 @@
 | 本地虚拟介质 | 板级 mass_storage.disk0/lun.0；镜像存储在 /var/lib/kvmd/msd |
 | ATX、扩展 GPIO | 未配置，不占用无关 GPIO |
 
-`vim4-pikvm.service` 以 khadas 运行 kvmd、kvmd-media、Janus 与私有 nginx，监听 8080。
+`vim4-pikvm.service` 以 khadas 运行 kvmd、kvmd-media、Janus 与私有 nginx，监听 127.0.0.1:8081，
+由管理器 8080 网关统一登录；应用 auth 关闭后首页隐藏退出，nginx 将 /login 重定向到 /。
 任一子进程退出会停止整组。与 NanoKVM、JetKVM、One-KVM 互斥，管理器等待旧应用
 退出后再切换。HDMI 服务独立保留 EDID/HPD，观看、刷新、调码率不重新协商 HDMI。
 整组进程共享私有 `/dev/shm`，避免普通用户注销时 logind 清除仍在使用的视频共享内存。
@@ -48,8 +49,9 @@ python3 tools/board.py deploy --exclusive --packages build/packages/VERSION
 PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pikvm` 与
 `vim4-manager` 两个 ARM64 deb、源码与依赖清单和校验和；复用已安装的板级和编码包。
 安装保留原应用选择，不自动启用 PiKVM；在管理器中选择 PiKVM 后打开 8080。
-首次使用上游默认网页账户 admin/admin；通过 `kvmd-htpasswd` 管理其独立密码文件，
-不改变 Ubuntu 账户。升级保留 htpasswd、TOTP 和 override.yaml。
+网页使用管理器账户，不改变 Ubuntu 账户。升级以 YAML 解析修改 override.yaml 中的
+kvmd.auth.enabled=false，保留其余设置、注释、htpasswd 和 TOTP。
+override.yaml 的优先级高于 override.d，因此不能用片段覆盖已有 enabled=true。
 
 验证包括 Janus 插件实际挂载/卸载、服务配置和动态库解析；软件通过不代表上板通过。
 硬件证据见公共工作区 `docs/bringup/README.md`（上板记录索引）。

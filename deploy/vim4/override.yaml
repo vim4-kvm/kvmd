@@ -1,0 +1,4 @@
+# Web sessions belong to vim4-manager; nginx only accepts loopback traffic.
+kvmd:
+    auth:
+        enabled: false
