@@ -20,7 +20,7 @@ Environment=GST_REGISTRY=/var/lib/kvmd/gstreamer-registry.bin
 Environment=PATH=/opt/vim4-pikvm/python/bin:/usr/sbin:/usr/bin:/sbin:/bin
 UMask=0077
 ExecStartPre=+/usr/libexec/vim4-pikvm-media prepare
-ExecStart=/usr/libexec/vim4-pikvm-run
+ExecStart=/usr/libexec/vim4-kvm-run pikvm
 ExecStopPost=+/usr/libexec/vim4-pikvm-media restore
 KillMode=control-group
 TimeoutStopSec=30

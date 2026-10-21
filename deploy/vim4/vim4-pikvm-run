@@ -3,8 +3,21 @@
 import asyncio
 import os
 import signal
+from pathlib import Path
+import shutil
 
 from kvmd.vim4video import read_codec
+
+
+def janus_config_directory():
+    source = Path('/etc/kvmd/janus')
+    if os.environ.get('VIM4_VIDEO_BACKEND') != 'wave5':
+        return str(source)
+    target = Path('/run/kvmd/janus')
+    shutil.copytree(source, target, dirs_exist_ok=True)
+    audio = target / 'janus.plugin.ustreamer.jcfg'
+    audio.write_text(audio.read_text().replace('hw:AMLAUGESOUND,0', 'hw:VIM4HDMIRX,0'))
+    return str(target)
 
 
 async def main():
@@ -24,7 +37,7 @@ async def main():
     video_commands = [
         ['/opt/vim4-pikvm/python/bin/kvmd-media', '--run'],
         ['/usr/bin/janus', '--disable-colors', '--plugins-folder=/usr/lib/ustreamer/janus',
-         '--configs-folder=/etc/kvmd/janus'],
+         '--configs-folder=' + janus_config_directory()],
     ]
     tasks = [
         asyncio.create_task(run_components(persistent_commands, stopped, asyncio.Event())),

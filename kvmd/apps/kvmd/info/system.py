@@ -122,7 +122,9 @@ class SystemInfoSubmanager(BaseInfoSubmanager):
         version = ""
         features: dict[str, bool] = {}
         try:
-            path = self.__streamer_cmd[0]
+            # VIM4's configured capture command starts with taskset. Probe the
+            # streamer itself so its version/features do not describe taskset.
+            path = ("/usr/bin/ustreamer" if env.VIM4 else self.__streamer_cmd[0])
             ((_, version), (_, features_text)) = await asyncio.gather(
                 aioproc.read_process([path, "--version"], err_to_null=True),
                 aioproc.read_process([path, "--features"], err_to_null=True),

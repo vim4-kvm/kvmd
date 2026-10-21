@@ -4,6 +4,11 @@
 运行于 Ubuntu 24.04，私有 Python 3.14 安装在 `/opt/vim4-pikvm/python`，不替换系统 Python。
 构建、打包与部署入口属于 [公共工作区](https://github.com/vim4-kvm/vim4-kvm)。
 
+公共 `vim4-kvm-run` 在 5.15 选择厂商后端，在匹配的 7.x 选择
+`vim4v4l2src` / `vim4wave5enc`；同一 `/var/lib/kvmd` 与 `/etc/kvmd` 保留。
+7.x 的 Janus 音频设备改写在 `/run/kvmd/janus`，不覆盖 5.15 的持久配置。
+更新应用前须安装提供 `vim4-runtime-api-1` 的板级包及匹配的主线插件。
+
 ## 硬件与服务
 
 | 功能 | 接口 |
