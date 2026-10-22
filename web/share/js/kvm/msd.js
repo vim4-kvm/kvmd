@@ -141,7 +141,8 @@ export function Msd() {
 						__state.storage.images = state.storage.images;
 					}
 				}
-				if (state.drive || (state.storage && state.storage.images !== undefined)) {
+				if (__state.drive && __state.storage.images !== undefined &&
+					(state.drive || (state.storage && state.storage.images !== undefined))) {
 					__updateImageSelector(__state.drive, __state.storage.images);
 				}
 			}
@@ -156,7 +157,7 @@ export function Msd() {
 	};
 
 	var __updateControls = function(state) {
-		let o = (state && state.online);
+		let o = !!(state && state.online && state.drive);
 		let d = (state ? state.drive : null);
 		let s = (state ? state.storage : null);
 		let busy = !!(state && state.busy);
@@ -278,14 +279,7 @@ export function Msd() {
 				el.__names_json = names_json;
 			}
 		}
-		const sourceLabels = {data: "共享数据盘", shared: "NanoKVM 镜像", jetkvm: "JetKVM 镜像", onekvm: "One-KVM 镜像"};
-		names.sort((a, b) => (images[a].source || "").localeCompare(images[b].source || ""));
-		let source = "";
 		for (let name of names) {
-			if (images[name].source && images[name].source !== source) {
-				source = images[name].source;
-				tools.selector.addComment(el, sourceLabels[source] || source);
-			}
 			let part = parts[name];
 			let title = (
 				name === ""
@@ -320,7 +314,14 @@ export function Msd() {
 			tools.selector.addOption(el, drive.image.name, sel);
 			tools.selector.addComment(el, __makeImageSelectorInfo(drive.image));
 		}
+		const sourceLabels = {data: "共享数据盘", shared: "NanoKVM 镜像", jetkvm: "JetKVM 镜像", onekvm: "One-KVM 镜像"};
+		names.sort((a, b) => (images[a].source || "").localeCompare(images[b].source || ""));
+		let source = "";
 		for (let name of names) {
+			if (images[name].source && images[name].source !== source) {
+				source = images[name].source;
+				tools.selector.addComment(el, sourceLabels[source] || source);
+			}
 			tools.selector.addSeparator(el);
 			tools.selector.addOption(el, name, name);
 			tools.selector.addComment(el, __makeImageSelectorInfo(images[name]));
