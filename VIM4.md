@@ -9,6 +9,11 @@
 7.x 的 Janus 音频设备改写在 `/run/kvmd/janus`，不覆盖 5.15 的持久配置。
 更新应用前须安装提供 `vim4-runtime-api-1` 的板级包及匹配的主线插件。
 
+5.15 原生 HDR 模式由启动器设置 `VIM4_SECONDARY_HDMI_CAPTURE=1`，uStreamer
+通过公共 `vim4vdin1src` 从 VDIN1 获取 SDR DMA 帧，同时供应 H.264/H.265 和
+JPEG 分支；VDIN0 保留 HDR 显示。须配套更新板级、采集与编码包，由启动器
+选择私有标准 V4L2 插件，不能使用会关闭主 RX 的系统厂商替代插件。
+
 ## 硬件与服务
 
 | 功能 | 接口 |
