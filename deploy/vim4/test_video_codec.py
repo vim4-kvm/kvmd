@@ -20,6 +20,15 @@ class CodecTest(unittest.TestCase):
         self.root = Path(self.enterContext(tempfile.TemporaryDirectory()))
         self.path = self.root / 'video-codec'
         self.enterContext(patch.object(vim4video, 'CODEC_PATH', self.path))
+        self.enterContext(patch.object(vim4video, 'HEIGHT_PATH', self.root / 'video-output-height'))
+
+    def test_output_height_persists_and_invalid_selection_preserves_previous_value(self):
+        self.assertEqual(vim4video.read_output_height(), 0)
+        vim4video.write_output_height(720)
+        self.assertEqual(vim4video.read_output_height(), 720)
+        with self.assertRaises(ValueError):
+            vim4video.write_output_height(719)
+        self.assertEqual(vim4video.read_output_height(), 720)
 
     def test_selection_survives_restart_and_invalid_write_preserves_it(self):
         self.assertEqual(vim4video.read_codec('h264'), 'h264')

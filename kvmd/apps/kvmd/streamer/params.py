@@ -101,6 +101,8 @@ class Params:
         return {
             **({
                 "video_codec": vim4video.read_codec(os.environ.get("VIM4_VIDEO_CODEC", "h264")),
+                "output_height": vim4video.read_output_height(),
+                "output_heights": list(vim4video.OUTPUT_HEIGHTS),
                 "h265": True,
             } if env.VIM4 else {}),
             self.__QUALITY: self.__has_quality,

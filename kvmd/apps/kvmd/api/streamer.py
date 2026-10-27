@@ -56,6 +56,21 @@ class StreamerApi:
 
     # =====
 
+    @exposed_http("POST", "/streamer/set_output_height")
+    async def __set_output_height_handler(self, req: Request) -> Response:
+        supervisor = os.environ.get("VIM4_SUPERVISOR_PID")
+        if not env.VIM4 or not supervisor:
+            raise UnavailableError()
+        height = int(check_string_in_list(req.query.get("height", ""), "Output height",
+                                        list(map(str, vim4video.OUTPUT_HEIGHTS))))
+        async with self.__codec_lock:
+            if height != vim4video.read_output_height():
+                vim4video.write_output_height(height)
+                os.kill(int(supervisor), signal.SIGHUP)
+                self.__request_restart()
+            await self.__streamer.trigger_state()
+        return make_json_response()
+
     @exposed_http("POST", "/streamer/set_codec")
     async def __set_codec_handler(self, req: Request) -> Response:
         supervisor = os.environ.get("VIM4_SUPERVISOR_PID")

@@ -17,6 +17,29 @@ from kvmd.validators import ValidatorError
 
 
 class DirectVideoTest(unittest.IsolatedAsyncioTestCase):
+    async def test_output_height_change_restarts_only_video_once_and_rejects_invalid_height(self):
+        root = Path(self.enterContext(tempfile.TemporaryDirectory()))
+        self.enterContext(patch.object(vim4video, 'HEIGHT_PATH', root / 'video-output-height'))
+        self.enterContext(patch('kvmd.apps.kvmd.api.streamer.env.VIM4', True))
+        self.enterContext(patch.dict('os.environ', {'VIM4_SUPERVISOR_PID': '123'}))
+        signal = self.enterContext(patch('kvmd.apps.kvmd.api.streamer.os.kill'))
+        restart = MagicMock()
+        streamer = AsyncMock()
+        api = StreamerApi(streamer, None, restart)
+        req = MagicMock()
+        req.query = {'height': '719'}
+        with self.assertRaises(ValidatorError):
+            await api._StreamerApi__set_output_height_handler(req)
+        signal.assert_not_called()
+        self.assertFalse(vim4video.HEIGHT_PATH.exists())
+        req.query = {'height': '720'}
+        await api._StreamerApi__set_output_height_handler(req)
+        await api._StreamerApi__set_output_height_handler(req)
+        self.assertEqual(vim4video.read_output_height(), 720)
+        signal.assert_called_once()
+        restart.assert_called_once_with()
+        streamer.ensure_restart.assert_not_awaited()
+
     def make_streamer(self, fmt):
         return MemsinkStreamerClient(fmt, 'test', 1, 1, 0)
 

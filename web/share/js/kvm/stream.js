@@ -69,6 +69,18 @@ export function Streamer() {
 		$("stream-desired-fps-slider").onchange = ((ev) => __sendParam("desired_fps", ev.target.valueAsNumber));
 
 		$("stream-resolution-selector").onchange = ((ev) => __sendParam("resolution", ev.target.value));
+		$("stream-output-height-selector").onchange = function(ev) {
+			let el = ev.target;
+			let previous = String(__state?.features?.output_height ?? 0);
+			el.disabled = true;
+			tools.httpPost("api/streamer/set_output_height", {"height": el.value}, function(http) {
+				el.disabled = false;
+				if (http.status !== 200) {
+					el.value = previous;
+					wm.error("Can't change output resolution", http.responseText);
+				}
+			});
+		};
 
 		tools.radio.setOnClick("stream-mode-radio", __clickModeRadio, false);
 
@@ -263,6 +275,15 @@ export function Streamer() {
 
 		if (state.features) {
 			let f = state.features;
+			tools.hidden.setVisible($("stream-output-height"), Array.isArray(f.output_heights));
+			if (Array.isArray(f.output_heights)) {
+				let el = $("stream-output-height-selector");
+				el.options.length = 0;
+				for (let height of f.output_heights) {
+					tools.selector.addOption(el, height ? `${height}p` : "Native input size", String(height));
+				}
+				el.value = String(f.output_height);
+			}
 			if (__switching_codec === f.video_codec) {
 				__switching_codec = false;
 			}

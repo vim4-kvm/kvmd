@@ -20,6 +20,13 @@ VDIN0 保留 HDR 显示。须配套更新提供 `vim4-hevc-hdr-api-1` 的编码�
 
 ## 硬件与服务
 
+视频菜单的「H.264/H.265 size」独立控制输出高度：原尺寸、480、720、1080、1440、
+1700、2160，宽度随输入比例，不放大。设置保存于 `/var/lib/kvmd/video-output-height`，
+仅重建uStreamer/媒体视频组件，保留认证和HID。5.15 SDR使用公共GE2D DMA缩放，
+HDR使用Mali/P010；八位HEVC宽度向下对齐16像素。JPEG/MJPEG及快照保留原尺寸。
+先更新提供连续DMA启动配置、`vim4-sdr-scale-api-1`及公共HEVC源的平台包，再更新应用。
+7.3复用 `vim4v4l2src height`，JPEG也跟随采集缩小；新增入口尚未在7.3上板验收。
+
 | 功能 | 接口 |
 |---|---|
 | 视频 | VIM4 uStreamer：vfmcapsrc → DMA → amlvenc / vim4jpegenc |

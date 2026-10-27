@@ -178,7 +178,7 @@ class Runner:  # pylint: disable=too-many-instance-attributes
         cmd = self.__make_cmd(self.__cmd)
         child_env = None
         if env.VIM4:
-            child_env = dict(os.environ, VIM4_VIDEO_CODEC=vim4video.read_codec(
+            child_env = dict(os.environ, VIM4_OUTPUT_HEIGHT=str(vim4video.read_output_height()), VIM4_VIDEO_CODEC=vim4video.read_codec(
                 os.environ.get("VIM4_VIDEO_CODEC", "h264"),
             ))
         self.__proc = await aioproc.run_process(cmd, env=child_env)

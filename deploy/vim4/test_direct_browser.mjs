@@ -28,7 +28,7 @@ const server = createServer(async (req, res) => {
     try {
         if (req.url === '/') {
             res.setHeader('Content-Type', 'text/html');
-            res.end('<canvas id="stream-canvas"></canvas>' +
+            res.end('<video id="stream-video" autoplay playsinline></video><canvas id="stream-canvas"></canvas>' +
                 ['orient', 'multimedia', 'audio', 'mic', 'mic-raw', 'camera']
                     .map(name => `<div id="stream-${name}"></div>`).join(''));
         } else if (req.url === '/ui') {
@@ -86,6 +86,11 @@ try {
     })));
 
     const selections = [];
+    const heights = [];
+    await page.route('**/api/streamer/set_output_height?*', async route => {
+        heights.push(new URL(route.request().url()).searchParams.get('height'));
+        await route.fulfill({json: {ok: true, result: {}}});
+    });
     await page.route('**/api/streamer/set_codec?*', async route => {
         selections.push(new URL(route.request().url()).searchParams.get('codec'));
         await route.fulfill({json: {ok: true, result: {}}});
@@ -105,7 +110,8 @@ try {
         window.ui = new Streamer();
         window.ui.ensureDeps(() => {});
         window.stateForCodec = codec => ({
-            features: {h264: true, h265: true, video_codec: codec, quality: true},
+            features: {h264: true, h265: true, video_codec: codec, quality: true,
+                output_height: 0, output_heights: [0, 480, 720, 1080, 1440, 1700, 2160]},
             limits: {desired_fps: {min: 0, max: 60}, h264_bitrate: {min: 1000, max: 60000}, h264_gop: {min: 1, max: 60}},
         });
         document.querySelector('#stream-window').classList.remove('hidden');
@@ -120,6 +126,15 @@ try {
     await page.evaluate(() => window.ui.setState(window.stateForCodec('h264')));
     assert(await page.locator('#stream-mode-radio-media').isChecked());
     assert.deepEqual(selections, ['h265'], 'State updates must not write the shared codec back');
+    // Labels and numeric values differ; the HTTP API accepts the numeric value.
+    const response = page.waitForResponse('**/api/streamer/set_output_height?*');
+    await page.locator('#stream-output-height-selector').selectOption('720', {force: true});
+    await response;
+    assert.deepEqual(heights, ['720']);
+    await page.evaluate(() => window.ui.setState({...window.stateForCodec('h264'),
+        features: {...window.stateForCodec('h264').features, output_height: 1080}}));
+    assert.equal(await page.locator('#stream-output-height-selector').inputValue(), '1080');
+    assert.deepEqual(heights, ['720'], 'State broadcasts must not rewrite the saved height');
     assert.deepEqual(errors, []);
     console.log('Video menu selects H.265 and follows another viewer without switching it back');
 } finally {
