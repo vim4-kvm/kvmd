@@ -5,8 +5,8 @@ import test from 'node:test';
 const source = await readFile(new URL('../../web/share/js/kvm/stream_hevc.js', import.meta.url), 'utf8');
 const {hevcCodecFromAnnexB} = await import(`data:text/javascript;base64,${Buffer.from(source).toString('base64')}`);
 
-function sps(level, start = [0, 0, 0, 1]) {
-    const rbsp = [1, 1, 0x60, 0, 0, 0, 0xb0, 0, 0, 0, 0, 0, level];
+function sps(level, start = [0, 0, 0, 1], profile = 1) {
+    const rbsp = [1, profile, profile === 2 ? 0x20 : 0x60, 0, 0, 0, 0xb0, 0, 0, 0, 0, 0, level];
     const escaped = [];
     let zeros = 0;
     for (const byte of rbsp) {
@@ -25,6 +25,13 @@ test('HEVC decoder level follows SPS across resolution changes and mixed start c
         const accessUnit = new Uint8Array([0, 0, 1, 0x40, 1, 0x80, ...sps(level, [0, 0, 1]),
             0, 0, 0, 1, 0x44, 1, 0x80, 0, 0, 1, 0x26, 1, 0x80]);
         assert.equal(hevcCodecFromAnnexB(accessUnit), `hev1.1.6.L${level}.B0`);
+    }
+});
+
+test('HEVC decoder follows Main10 and SDR profile transitions', () => {
+    for (const profile of [2, 1, 2]) {
+        assert.equal(hevcCodecFromAnnexB(new Uint8Array(sps(150, [0, 0, 1], profile))),
+            `hev1.${profile}.${profile === 2 ? 4 : 6}.L150.B0`);
     }
 });
 

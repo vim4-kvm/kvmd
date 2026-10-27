@@ -45,6 +45,10 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 	var __frame = null;
 	var __canvas = $("stream-canvas");
 	var __ctx = __canvas.getContext("2d");
+	var __video = $("stream-video");
+	var __hdr_track = null;
+	var __hdr_writer = null;
+	var __presenting_hdr = false;
 
 	var __state = null;
 	var __fps_accum = 0;
@@ -72,18 +76,23 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 	self.getMode = () => (video_codec === "h265" ? "media-h265" : "media");
 
 	self.getResolution = function() {
+		let view = (__presenting_hdr ? __video : __canvas);
 		return {
 			// Разрешение видео или элемента
 			"real_width": (__canvas.width || __canvas.offsetWidth),
 			"real_height": (__canvas.height || __canvas.offsetHeight),
-			"view_width": __canvas.offsetWidth,
-			"view_height": __canvas.offsetHeight,
+			"view_width": view.offsetWidth,
+			"view_height": view.offsetHeight,
 		};
 	};
 
 	self.ensureStream = function(state) {
 		__state = state;
 		__stop = false;
+		if (!__hdr_track && window.MediaStreamTrackGenerator) {
+			__hdr_track = new window.MediaStreamTrackGenerator({kind: "video"});
+			__hdr_writer = __hdr_track.writable.getWriter();
+		}
 		__ensureMedia(false);
 	};
 
@@ -92,6 +101,15 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 		__ensuring = false;
 		__wsForceClose();
 		__setInfo(false, false, "");
+		if (__hdr_track) {
+			__hdr_writer.abort().catch(() => {});
+			__hdr_track.stop();
+			if (__video.srcObject?.getVideoTracks().includes(__hdr_track)) __video.srcObject = null;
+			__video.style.transform = "";
+			__hdr_track = null;
+			__hdr_writer = null;
+			__presenting_hdr = false;
+		}
 	};
 
 	var __ensureMedia = function(internal) {
@@ -333,6 +351,38 @@ export function MediaStreamer(__setActive, __setInactive, __setInfo, __watchHook
 				__organizeHook();
 			}
 
+			if (__hdr_track && ["pq", "hlg"].includes(__frame.colorSpace.transfer)) {
+				// Preserve the decoded HDR surface and its color metadata. The
+				// ordinary Canvas path converts to SDR before presentation.
+				if (!__video.srcObject?.getVideoTracks().includes(__hdr_track)) {
+					__video.srcObject = new MediaStream([__hdr_track]);
+					__video.play().catch(() => {});
+				}
+				tools.hidden.setVisible(__video, true);
+				tools.hidden.setVisible(__canvas, false);
+				__presenting_hdr = true;
+				// Match the counterclockwise Canvas orientation. Quarter turns
+				// need their unrotated box exchanged to fit the same viewport.
+				let quarter = (__orient === 90 || __orient === 270);
+				let box_width = __video.clientWidth;
+				let box_height = __video.clientHeight;
+				let fit = Math.min(box_width / __frame.displayWidth, box_height / __frame.displayHeight);
+				let rotated_fit = Math.min(box_width / __frame.displayHeight, box_height / __frame.displayWidth);
+				let scale = quarter && fit > 0 ? rotated_fit / fit : 1;
+				__video.style.transform = `rotate(${-__orient}deg) scale(${scale})`;
+				if (__hdr_writer.desiredSize > 0) {
+					let frame = __frame.clone();
+					__hdr_writer.write(frame).catch(__logInfo).finally(() => frame.close());
+					__fps_accum += 1;
+				}
+				return;
+			}
+			if (__video.srcObject?.getVideoTracks().includes(__hdr_track)) {
+				tools.hidden.setVisible(__video, false);
+				tools.hidden.setVisible(__canvas, true);
+				__presenting_hdr = false;
+				__video.style.transform = "";
+			}
 			if (__orient === 0) {
 				__ctx.drawImage(__frame, 0, 0);
 			} else {

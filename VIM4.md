@@ -10,8 +10,12 @@
 更新应用前须安装提供 `vim4-runtime-api-1` 的板级包及匹配的主线插件。
 
 5.15 原生 HDR 模式由启动器设置 `VIM4_SECONDARY_HDMI_CAPTURE=1`，uStreamer
-通过公共 `vim4vdin1src` 从 VDIN1 获取 SDR DMA 帧，同时供应 H.264/H.265 和
-JPEG 分支；VDIN0 保留 HDR 显示。须配套更新板级、采集与编码包，由启动器
+通过公共 `vim4vdin1src` 从 VDIN1 获取 SDR DMA 帧，供应 H.264 和 JPEG。
+H.265 改用 `vim4h265src`，跟随管理器全局「HDR 转 SDR」开关：关闭且输入为
+PQ 时输出 Main10/BT.2020，其余输入保留 SDR。Janus 明确协商 Main10；
+Direct 根据 SPS 切换解码器，支持原生视频轨道的浏览器保留 HDR 显示。
+普通 Canvas 仅作为 SDR/兼容路径，Safari 真 HDR 尚未验收。
+VDIN0 保留 HDR 显示。须配套更新提供 `vim4-hevc-hdr-api-1` 的编码包与板级、采集包，由启动器
 选择私有标准 V4L2 插件，不能使用会关闭主 RX 的系统厂商替代插件。
 
 ## 硬件与服务

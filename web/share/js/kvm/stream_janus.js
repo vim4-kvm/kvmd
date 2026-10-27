@@ -460,6 +460,14 @@ export function JanusStreamer(__setActive, __setInactive, __setInfo, __watchHook
 
 				if (jsep) {
 					__logInfo("Handling SDP:", jsep);
+					if (video_codec === "h265" && /profile-id=2(?:;|\r|\n)/.test(jsep.sdp)) {
+						let main10 = window.RTCRtpReceiver?.getCapabilities("video")?.codecs.some(codec =>
+							codec.mimeType.toLowerCase() === "video/h265" && /(?:^|;)\s*profile-id=2(?:;|$)/.test(codec.sdpFmtpLine || ""));
+						if (!main10) {
+							__setInfo(false, false, "This browser cannot receive HEVC Main10. Select H.264 for SDR video.");
+							return;
+						}
+					}
 
 					let audio = (__has_audio && !!__use_audio);
 
