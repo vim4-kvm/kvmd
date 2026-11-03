@@ -22,9 +22,6 @@ kvmd:
             default: 12000
             min: 1000
             max: 60000
-        h264_gop:
-            default: 30
-            min: 1
         cmd:
             # CPU0 handles Ethernet and JPEG IRQs. JPEG work on that CPU can
             # throttle capture and cause UDP send-buffer errors during playback.

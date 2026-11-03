@@ -21,7 +21,9 @@
 
 
 import copy
+import os
 
+from .. import env
 from ..tools import walk_dict
 from ..tools import is_dict
 
@@ -396,7 +398,8 @@ def make_config_scheme() -> dict:
                 },
 
                 "h264_gop": {
-                    "default": Option(0,  type=valid_stream_h264_gop, unpack_as="h264_gop"),
+                    "default": Option(30 if env.VIM4 and os.environ.get("VIM4_VIDEO_BACKEND") != "wave5" else 0,
+                                      type=valid_stream_h264_gop, unpack_as="h264_gop"),
                     "min":     Option(0,  type=valid_stream_h264_gop, unpack_as="h264_gop_min"),
                     "max":     Option(60, type=valid_stream_h264_gop, unpack_as="h264_gop_max"),
                 },
