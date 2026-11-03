@@ -7,6 +7,7 @@
 公共 `vim4-kvm-run` 在 5.15 选择厂商后端，在匹配的 7.x 选择
 `vim4v4l2src` / `vim4wave5enc`；同一 `/var/lib/kvmd` 与 `/etc/kvmd` 保留。
 7.x 的 Janus 音频设备改写在 `/run/kvmd/janus`，不覆盖 5.15 的持久配置。
+Wave5 的 H.264 与 H.265 默认 GOP 0、关闭循环刷新。新观看者接入或收到 PLI 时按需输出 IDR。
 更新应用前须安装提供 `vim4-runtime-api-1` 的板级包及匹配的主线插件。
 
 5.15 原生 HDR 模式由启动器设置 `VIM4_SECONDARY_HDMI_CAPTURE=1`，uStreamer
