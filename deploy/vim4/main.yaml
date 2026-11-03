@@ -17,7 +17,7 @@ kvmd:
     streamer:
         desired_fps:
             default: 60
-            max: 60
+            max: 120
         h264_bitrate:
             default: 12000
             min: 1000
