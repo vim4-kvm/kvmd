@@ -403,9 +403,9 @@ export function JanusStreamer(__setActive, __setInactive, __setInfo, __watchHook
 
 			"webrtcState": function(up) {
 				__logInfo("Janus says our WebRTC PeerConnection is", (up ? "up" : "down"), "now");
-				/*if (up) {
+				if (up) {
 					__sendKeyRequired();
-				}*/
+				}
 			},
 
 			"onmessage": function(msg, jsep) {
