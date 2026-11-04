@@ -1,116 +1,76 @@
 # PiKVM on VIM4 Ubuntu
 
-`vim4` 分支保留 PiKVM 网页、认证和 API；`KVMD_PLATFORM=vim4` 选择板级差异。
-运行于 Ubuntu 24.04，私有 Python 3.14 安装在 `/opt/vim4-pikvm/python`，不替换系统 Python。
-构建、打包与部署入口属于 [公共工作区](https://github.com/vim4-kvm/vim4-kvm)。
+本页管 PiKVM 的板级生命周期、共享介质与浏览器视频边界。
+当前重点：公共网关认证，平台组件先于应用升级，视频重建须保留 HID。
+按需读：[服务与介质](#服务与介质)、[视频](#视频与浏览器)、[构建](#构建与验证)。
+参数、路径、默认值以链接的配置和源码为准；历史通过不代表当前上板通过。
 
-公共 `vim4-kvm-run` 在 5.15 选择厂商后端，在匹配的 7.x 选择
-`vim4v4l2src` / `vim4wave5enc`；同一 `/var/lib/kvmd` 与 `/etc/kvmd` 保留。
-7.x 的 Janus 音频设备改写在 `/run/kvmd/janus`，不覆盖 5.15 的持久配置。
-Wave5 的 H.264 与 H.265 默认 GOP 0、关闭循环刷新。新观看者接入或收到 PLI 时按需输出 IDR。
-更新应用前须安装提供 `vim4-runtime-api-1` 的板级包及匹配的主线插件。
+## 服务与介质
 
-5.15 原生 HDR 模式由启动器设置 `VIM4_SECONDARY_HDMI_CAPTURE=1`，uStreamer
-通过公共 `vim4vdin1src` 从 VDIN1 获取 SDR DMA 帧，供应 H.264 和 JPEG。
-H.265 改用 `vim4h265src`，跟随管理器全局「HDR 转 SDR」开关：关闭且输入为
-PQ 时输出 Main10/BT.2020，其余输入保留 SDR。Janus 明确协商 Main10；
-Direct 根据 SPS 切换解码器，支持原生视频轨道的浏览器保留 HDR 显示。
-普通 Canvas 仅作为 SDR/兼容路径，Safari 真 HDR 尚未验收。
-VDIN0 保留 HDR 显示。须配套更新提供 `vim4-hevc-hdr-api-1` 的编码包与板级、采集包，由启动器
-选择私有标准 V4L2 插件，不能使用会关闭主 RX 的系统厂商替代插件。
+平台入口保留原生网页与 API，使用私有 Python，不替换系统解释器。
+[启动器](deploy/vim4/vim4-pikvm-run)协调持久组件与视频组件：
+子进程异常退出停止整组，编码切换只重建视频组，认证、HID 与介质服务继续运行。
+[服务配置](deploy/vim4/vim4-pikvm.service)提供私有共享内存，避免用户注销时被 logind 清理。
+视频线程避开网卡/JPEG 中断所在 CPU；此前线程争用同时导致采集降帧和 UDP 缓冲错误。
+此限制不能推及 Janus、HID 或系统中断。
 
-## 硬件与服务
+公共启动器按内核选择后端，保留账户和数据；主线音频配置在运行目录生成，
+不覆盖厂商内核的持久配置。应用经管理器统一登录，
+[nginx](deploy/vim4/nginx.conf)与[应用配置](deploy/vim4/override.yaml)
+维护入口，不使用上游账户页面。升级修改 YAML 应保留其余设置、注释与认证数据；
+主 override 优先于片段，不能用片段覆盖旧的认证开关。
+ATX/扩展 GPIO 未接线，不占无关 GPIO；不安装树莓派 OTG、风扇或整机更新服务。
 
-视频菜单的「H.264/H.265 size」独立控制输出高度：原尺寸、480、720、1080、1440、
-1700、2160，宽度随输入比例，不放大。设置保存于 `/var/lib/kvmd/video-output-height`，
-仅重建uStreamer/媒体视频组件，保留认证和HID。5.15 SDR使用公共GE2D DMA缩放，
-HDR使用Mali/P010；八位HEVC宽度向下对齐16像素。JPEG/MJPEG及快照保留原尺寸。
-先更新提供连续DMA启动配置、`vim4-sdr-scale-api-1`及公共HEVC源的平台包，再更新应用。
-7.3复用 `vim4v4l2src height`，JPEG也跟随采集缩小；新增入口尚未在7.3上板验收。
+启动前 [限定介质助手](deploy/vim4/vim4-pikvm-media)拒绝已挂载介质，保存 USB 链接与 LUN 标志，
+必要时释放网卡端点，退出恢复。不得删除 HID 实例。
+先在 USB 主机安全弹出，再切应用；不自动迁移其他应用的挂载。
+目录逐级拒绝链接、越界及硬链接，固定 inode 防止重命名替换；
+共享目录读取、双锁与编辑锁遵循公共
+[vim4media](https://github.com/vim4-kvm/vim4-kvm/blob/main/board/vim4media.py)。
+其他来源镜像与共享盘只读，不允许删除覆盖，ISO 强制光盘。
+本应用挂载的目录外镜像可弹出，他处挂载的仍显示为外部介质；
+目录刷新不能绕过启动时占用检查。
 
-| 功能 | 接口 |
-|---|---|
-| 视频 | VIM4 uStreamer：vfmcapsrc → DMA → amlvenc / vim4jpegenc |
-| 浏览器视频 | Janus H.264/H.265 WebRTC、H.264/H.265 Direct WebSocket、MJPEG |
-| HDMI 声音 | Janus uStreamer 插件，ALSA hw:AMLAUGESOUND,0，48 kHz |
-| 键盘、绝对鼠标、相对鼠标 | hidg0、hidg1、hidg2；与板级报告长度匹配，关闭水平滚轮 |
-| 本地虚拟介质 | 板级 mass_storage.disk0/lun.0；镜像存储在 /var/lib/kvmd/msd |
-| ATX、扩展 GPIO | 未配置，不占用无关 GPIO |
+## 视频与浏览器
 
-`vim4-pikvm.service` 以 khadas 运行 kvmd、kvmd-media、Janus 与私有 nginx，监听 127.0.0.1:8081，
-由管理器 8080 网关统一登录；应用 auth 关闭后首页隐藏退出，nginx 将 /login 重定向到 /。
-任一子进程退出会停止整组。与 NanoKVM、JetKVM、One-KVM 互斥，管理器等待旧应用
-退出后再切换。HDMI 服务独立保留 EDID/HPD，观看、刷新、调码率不重新协商 HDMI。
-整组进程共享私有 `/dev/shm`，避免普通用户注销时 logind 清除仍在使用的视频共享内存。
-uStreamer 及其采集、编码线程限定在 CPU1–7，避开处理网卡与 JPEG 中断的 CPU0。
-板上实测 JPEG 线程运行于 CPU0 时会同时出现采集降帧和 UDP 发送缓冲错误；
-此限制只作用于视频进程，不改变 Janus、键鼠服务或系统中断的亲和性。
-应用不安装或启动树莓派的 OTG、风扇、启动配置或整机更新服务。
+菜单、持久选择和输出高度见 [vim4video](kvmd/vim4video.py)，
+后端路由见公共[音视频说明](https://github.com/vim4-kvm/vim4-kvm/blob/main/docs/subsystems/video.md)。
+所有观看者共享编码器，切编码会重启视频组件并短暂重连；
+其他观看者保留传输偏好，不因刷新覆盖共享编码。
+尺寸只缩小、不放大；厂商 SDR 用 GE2D，HDR 用 Mali/P010，JPEG 保留独立路径。
+主线 JPEG 跟随采集缩小；此新增入口仍待上板。
+先部署匹配的启动器、采集、编码与私有标准 V4L2 插件；
+厂商替代插件会关闭主 RX，不可混用。HDMI 服务独立，观看与调码率不重新协商输入。
 
-启动前，限定助手检查无已挂载介质，保存 USB 链接与 LUN 标志；必要时暂时移除 NCM，
-为三个 HID 与一个磁盘保留端点。退出后恢复原始链接和标志。不删除 HID 实例。
-挂载镜像逐层拒绝符号链接、路径越界和硬链接，以文件描述符固定 inode，防止重命名替换。
-限定助手的 `catalog` 从 `/usr/lib/vim4-kvm/python/vim4media.py` 读取共享目录。
-原生镜像选择器按来源分组显示其他 KVM 镜像与共享数据盘，全部只读，不能删除或覆盖；
-外部 ISO 强制按光盘挂载。挂载持有两个共享介质锁，并通过 `open_image()` 检查数据盘
-编辑锁。通过 PiKVM 挂载的目录外镜像可正常弹出；他处挂载的目录外镜像仍显示为外部介质。
-共享目录每 10 秒刷新一次，仅变化时通知网页；启动 `prepare` 仍拒绝已占用的 LUN。
-必须先在 USB 主机安全弹出已有虚拟磁盘，再切换应用。切换不自动迁移其他应用的镜像。
+HEVC 原生 PQ 跟随管理器全局偏好，SDR 不增加十位转换；
+Janus 按实际能力协商，Direct 从 SPS 选择解码器并等含参数集的关键帧。
+普通 Canvas 是兼容 SDR 路径，Safari 真 HDR 未验收。
+Direct 依赖浏览器相应解码能力与安全上下文，不传音频。
+[Direct 实现](web/share/js/kvm/stream_media.js)让已提交解码完成后再请求关键帧，
+避免反复取消慢解码导致永远无画面；服务端溢出丢旧 GOP 依赖帧。
+显示刷新只画最新已解码帧，但编码帧仍须顺序解码，不能破坏参考链。
+这不能消除 TCP 内部积压。视频 WebSocket 禁用重复压缩，
+否则大关键帧会被再次压缩而延迟后续帧。
 
-## 构建与部署
+Janus 保留双栈，使用 regular nomination。双网卡曾出现统计所选候选与实际视频收包接口不符，
+排查须核对实际接口，不能只看网页地址或 selected candidate pair。
+远端 NBD、USB 麦克风/网卡管理、树莓派更新与可选扩展不属此次集成。
+历史多模式验收见
+[上板索引](https://github.com/vim4-kvm/vim4-kvm/blob/main/docs/bringup/README.md)；
+长期运行、运动端到端延迟和全部浏览器仍未覆盖。
 
-在完整工作区执行：
+## 构建与验证
 
+完整工作区用 [构建工具](https://github.com/vim4-kvm/vim4-kvm/blob/main/tools/ubuntu-build.py)
+的 environment、package、verify 流程，再用部署工具安装。参数以工具帮助为准。
+复用平台包，安装保留原应用选择；切至 PiKVM 后使用管理器账户，不更改 Ubuntu 账户。
+软件核验须包含 Janus 实际挂卸载、服务配置与动态库解析。
+
+子仓库离线回归：
 ```sh
-python3 tools/ubuntu-build.py environment --component pikvm
-python3 tools/ubuntu-build.py package --component pikvm --version VERSION
-python3 tools/ubuntu-build.py verify --component pikvm --version VERSION
-python3 tools/board.py deploy --exclusive --packages build/packages/VERSION
+python3 -m unittest discover -s deploy/vim4 -p 'test_*.py'
+node --test deploy/vim4/test_stream_hevc.mjs deploy/vim4/test_direct_render.mjs
 ```
-
-PiKVM 构建镜像基于已有 `vim4-kvm-builder:ubuntu24.04`。输出 `vim4-pikvm` 与
-`vim4-manager` 两个 ARM64 deb、源码与依赖清单和校验和；复用已安装的板级和编码包。
-安装保留原应用选择，不自动启用 PiKVM；在管理器中选择 PiKVM 后打开 8080。
-网页使用管理器账户，不改变 Ubuntu 账户。升级以 YAML 解析修改 override.yaml 中的
-kvmd.auth.enabled=false，保留其余设置、注释、htpasswd 和 TOTP。
-override.yaml 的优先级高于 override.d，因此不能用片段覆盖已有 enabled=true。
-
-验证包括 Janus 插件实际挂载/卸载、服务配置和动态库解析；软件通过不代表上板通过。
-硬件证据见公共工作区 `docs/bringup/README.md`（上板记录索引）。
-
-Direct 播放在解码积压达到六帧时停止接受新输入，允许已有解码任务完成后请求关键帧，
-等待新关键帧后恢复，避免反复取消慢解码任务导致一直没有画面；
-服务端发送队列溢出也会丢弃旧 GOP 的后续依赖帧。此策略保留分辨率与码率，
-慢客户端会短暂等待关键帧，而不是持续播放积压画面。它不能消除 TCP 内部已缓存的数据。
-
-视频切换回归在构建环境运行 `python3 -m unittest discover -s deploy/vim4 -p 'test_*.py'`；
-HEVC SPS 解析和 Direct 绘制生命周期运行
-`node --test deploy/vim4/test_stream_hevc.mjs deploy/vim4/test_direct_render.mjs`。
-`node deploy/vim4/test_direct_browser.mjs /path/to/recording.h265` 使用以关键帧开头的
-Annex B 录像，在本机 Chrome 验证真实 Direct 解码、重连和菜单切换，不访问板子。
-需要 Playwright（可通过 `PLAYWRIGHT_MODULE` 指定已有模块路径）和 Chrome。
-
-## 边界
-
-当前输出尺寸跟随 HDMI 输入，视频帧率可限制，H.264 码率范围 1000–60000 kbps。
-默认 H.264，关键帧间隔 30 帧。网页 Video mode 提供 WebRTC H.264、Direct H.264、
-WebRTC H.265、Direct H.265 和 MJPEG。H.265 分别要求浏览器支持 HEVC WebRTC 或
-HEVC WebCodecs；Direct 使用 HTTPS（或 localhost 安全上下文），两种 Direct 均不传音频。
-所有观看者共用编码器：切换 H.264/H.265 会重启采集编码、Janus 和 media 服务，
-所有观看者短暂重连；认证、键鼠和虚拟介质服务保持运行。其他观看者跟随当前编码，
-保留各自的 WebRTC/Direct/MJPEG 传输选择，不会因刷新页面覆盖共享编码。
-选择保存在 `/var/lib/kvmd/video-codec`，优先于 `/etc/default/vim4-pikvm` 的
-`VIM4_VIDEO_CODEC` 启动默认值；删除该状态文件后重启服务可恢复启动默认值。
-Direct H.265 从关键帧 SPS 读取解码 profile/level，并等待包含参数集的关键帧开始播放。
-Direct 在每次显示刷新时绘制最新已解码帧，释放同一刷新周期内被替代的旧帧；
-编码帧仍按顺序解码，避免破坏帧间依赖。这减少突发到达时显示陈旧画面的延迟。
-Direct 视频 WebSocket 不协商 permessage-deflate：视频已由编码器压缩，再压缩大关键帧
-会延迟发送并积压后续帧，表现为周期性卡顿；控制通道保持原有压缩设置。
-EDID/HDR 使用已有板级工具与管理器。2026-10-15 的 `.50` 包已实板验证四种视频模式的
-4K 解码、编码切换和刷新重连；Direct 通过 localhost SSH 转发验证。未覆盖长时间运行、
-运动画面端到端延迟及所有浏览器，证据见公共工作区 `docs/bringup/README.md`（上板记录索引）。
-Janus 使用 regular ICE nomination，保留 IPv4/IPv6。双网卡客户端上 aggressive
-nomination 曾将视频发往 Wi-Fi IPv6，而浏览器统计报告有线 IPv4；定位网络卡顿时
-需要核对实际收包接口，不能仅凭网页地址或 selected candidate pair 判断视频路径。
-本地镜像上传、下载与挂载使用原生业务；远端 NBD 直连、USB 麦克风、USB 网卡管理、
-树莓派整机更新与可选扩展服务不在本次板级集成中，不能通过上游固件更新 VIM4。
+真实浏览器 Direct 回归见 [浏览器测试](deploy/vim4/test_direct_browser.mjs)头部与参数：
+使用从关键帧开始的 Annex B 录像、本机 Chrome 与 Playwright，不访问板子。
+离线通过不能替代实际 USB 枚举、GPU、HDR 或浏览器硬件验收。
